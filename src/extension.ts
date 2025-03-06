@@ -68,19 +68,19 @@ async function generateReport() {
     let report = 'Hi everyone,\nYesterday\n';
     if (yesterdayTasks.length > 0) {
         for (const task of yesterdayTasks) {
-            report += ` ${task.key}: ${task.fields.summary}\n`;
+            report += `- ${task.key}: ${task.fields.summary}\n`; // Use bullet-point format
         }
     } else {
-        report += ' No tasks logged.\n';
+        report += '- No tasks logged.\n';
     }
 
     report += 'Today\n';
     if (backlogTasks.length > 0) {
         for (const task of backlogTasks) {
-            report += ` ${task.key}: ${task.fields.summary}\n`;
+            report += `- ${task.key}: ${task.fields.summary}\n`; // Use bullet-point format
         }
     } else {
-        report += ' No tasks planned.\n';
+        report += '- No tasks planned.\n';
     }
 
     report += 'No blockers\n';
