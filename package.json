@@ -2,14 +2,15 @@
   "name": "jira-daily-report",
   "displayName": "jira-daily-report",
   "description": "Generates a daily Jira report for yesterday and today",
-  "version": "0.0.3",
+  "version": "0.0.7",
   "publisher": "thuanvo",
+  "icon": "images/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/voxuanthuan/daily-report.git"
   },
   "engines": {
-    "vscode": "^1.98.0"
+    "vscode": "^1.80.0"
   },
   "categories": [
     "Other"
@@ -61,7 +62,7 @@
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
-    "@types/vscode": "^1.98.0",
+    "@types/vscode": "^1.80.0",
     "@typescript-eslint/eslint-plugin": "^8.25.0",
     "@typescript-eslint/parser": "^8.25.0",
     "@vscode/test-cli": "^0.0.10",

@@ -22,12 +22,14 @@ function getYesterday(): string {
 // Fetch yesterday's tasks
 async function getYesterdayTasks(): Promise<any[]> {
     const yesterday = getYesterday();
-    const jql = `worklogAuthor = '${JIRA_USERNAME}' AND worklogDate = '${yesterday}'`;
+    const jql = `assignee = '${JIRA_USERNAME}' AND worklogDate = '${yesterday}'`;
     const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}`;
     console.log(`Requesting: ${url}`);
     
     try {
         const response = await axios.get(url, { headers });
+        console.log(`Response: Total issues found: ${response.data.total}`);
+        console.log(`Issues: ${JSON.stringify(response.data.issues, null, 2)}`);
         return response.data.issues || [];
     } catch (error: any) {
         console.error(`Error fetching yesterday's tasks: ${error.message}`);
@@ -46,6 +48,8 @@ async function getBacklogTasks(): Promise<any[]> {
     
     try {
         const response = await axios.get(url, { headers });
+        console.log(`Response: Total issues found: ${response.data.total}`);
+        console.log(`Issues: ${JSON.stringify(response.data.issues, null, 2)}`);
         return response.data.issues || [];
     } catch (error: any) {
         console.error(`Error fetching backlog tasks: ${error.message}`);
