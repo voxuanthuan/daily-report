@@ -3,6 +3,11 @@
   "displayName": "jira-daily-report",
   "description": "Generates a daily Jira report for yesterday and today",
   "version": "0.0.1",
+  "publisher": "thuanvo",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/voxuanthuan/daily-report.git"
+  },
   "engines": {
     "vscode": "^1.98.0"
   },
