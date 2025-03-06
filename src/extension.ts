@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
+import moment from 'moment';
 
-// Jira API setup
 const config = vscode.workspace.getConfiguration('grappleDailyReport');
 const JIRA_SERVER = config.get('jiraServer') as string;
 const JIRA_USERNAME = config.get('username') as string;
@@ -12,14 +12,23 @@ const headers = {
     'Content-Type': 'application/json'
 };
 
-// Utility to get yesterday's date
-function getYesterday(): string {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    return yesterday.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+/**
+ * Returns yesterday’s date as a formatted string (YYYY-MM-DD).
+ * If the given reference date (or today, if omitted) is Monday, it returns the previous Friday.
+ *
+ * @param referenceDate Optional moment.Moment to use as “today” for testing purposes.
+ */
+export function getYesterday(referenceDate?: moment.Moment): string {
+    // Use the provided reference date or the current date
+    const today = referenceDate ? moment(referenceDate) : moment();
+    // In moment, Sunday = 0, Monday = 1, etc.
+    if (today.day() === 1) { // if Monday, subtract 3 days to get Friday
+        return today.subtract(3, 'days').format('YYYY-MM-DD');
+    } else {
+        return today.subtract(1, 'days').format('YYYY-MM-DD');
+    }
 }
 
-// Fetch yesterday's tasks
 async function getYesterdayTasks(): Promise<any[]> {
     const yesterday = getYesterday();
     const jql = `assignee = '${JIRA_USERNAME}' AND worklogDate = '${yesterday}'`;
@@ -40,7 +49,6 @@ async function getYesterdayTasks(): Promise<any[]> {
     }
 }
 
-// Fetch backlog tasks
 async function getBacklogTasks(): Promise<any[]> {
     const jql = `assignee = '${JIRA_USERNAME}' AND status IN ('To Do', 'In Progress')`;
     const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}`;
@@ -60,7 +68,6 @@ async function getBacklogTasks(): Promise<any[]> {
     }
 }
 
-// Generate and display the report
 async function generateReport() {
     const yesterdayTasks = await getYesterdayTasks();
     const backlogTasks = await getBacklogTasks();
@@ -85,7 +92,6 @@ async function generateReport() {
 
     report += 'No blockers\n';
 
-    // Create an output channel instead of writing to a file
     const outputChannel = vscode.window.createOutputChannel('Jira Daily Report');
     outputChannel.clear();
     outputChannel.append(report);
@@ -95,11 +101,8 @@ async function generateReport() {
 // Extension activation
 export function activate(context: vscode.ExtensionContext) {
     console.log('Jira Daily Report extension is now active!');
-
-    // Register the command
     const disposable = vscode.commands.registerCommand('jiraDailyReport.generate', generateReport);
     context.subscriptions.push(disposable);
 }
 
-// Extension deactivation
 export function deactivate() {}
