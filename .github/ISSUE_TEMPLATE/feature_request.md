@@ -7,9 +7,6 @@ assignees: voxuanthuan
 
 ---
 
-### Title
-[Short, descriptive summary of the feature, e.g., "Add support for dark mode themes"]
-
 ### Description
 A clear and concise description of the feature you’d like to see. What problem does it solve, or how does it improve the extension?
 
