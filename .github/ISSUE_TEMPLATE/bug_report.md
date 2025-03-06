@@ -7,11 +7,6 @@ assignees: voxuanthuan
 
 ---
 
-## Bug Report
-
-### Title
-[Short, descriptive summary of the bug, e.g., "Extension crashes on startup"]
-
 ### Description
 A clear and concise description of the bug. What did you observe? How does it affect your use of the extension?
 
