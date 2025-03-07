@@ -69,10 +69,15 @@ async function getBacklogTasks(): Promise<any[]> {
 }
 
 async function generateReport() {
+    const today = moment();
+    const yesterday = getYesterday();
+    
+    const label = today.day() === 1 ? "Last Friday" : "Yesterday";
+
     const yesterdayTasks = await getYesterdayTasks();
     const backlogTasks = await getBacklogTasks();
 
-    let report = 'Hi everyone,\nYesterday\n';
+    let report = `Hi everyone,\n${label}\n`;
     if (yesterdayTasks.length > 0) {
         for (const task of yesterdayTasks) {
             report += ` ${task.key}: ${task.fields.summary}\n`;
@@ -98,7 +103,7 @@ async function generateReport() {
     outputChannel.show();
 }
 
-// Extension activation
+
 export function activate(context: vscode.ExtensionContext) {
     console.log('Jira Daily Report extension is now active!');
     const disposable = vscode.commands.registerCommand('jiraDailyReport.generate', generateReport);
