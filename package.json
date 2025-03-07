@@ -29,12 +29,12 @@
       "properties": {
         "grappleDailyReport.jiraServer": {
           "type": "string",
-          "default": "",
-          "description": "Jira server URL (e.g., https://yourcompany.atlassian.net)"
+          "default": "https://yourcompany.atlassian.net",
+          "description": "Jira server URL (e.g., https://grapplefinance.atlassian.net/)"
         },
         "grappleDailyReport.username": {
           "type": "string",
-          "default": "",
+          "default": "thuan@wearebloom.com.au",
           "description": "Your Jira username (email)"
         },
         "grappleDailyReport.apiToken": {

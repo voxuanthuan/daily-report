@@ -1,9 +1,9 @@
-# Change Log
+# Changelog
 
-All notable changes to the "jira-daily-report" extension will be documented in this file.
+## [0.0.8] - 2025-03-07
+### Added
+- New feature: Added bullet points for listing tasks in the daily report
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
-
-## [Unreleased]
-
-- Initial release
+## [0.0.1] - 2025-03-06
+### Added
+- Initial release with Jira daily report generation
