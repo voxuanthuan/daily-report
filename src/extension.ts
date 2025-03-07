@@ -53,14 +53,26 @@ async function getYesterdayTasks(): Promise<any[]> {
 
 async function getBacklogTasks(): Promise<any[]> {
     const jql = `assignee = '${JIRA_USERNAME}' AND status IN ('To Do', 'In Progress')`;
-    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}`;
+    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,parent`;
     console.log(`Requesting: ${url}`);
-    
+
     try {
         const response = await axios.get(url, { headers });
-        console.log(`Response: Total issues found: ${response.data.total}`);
-        console.log(`Issues: ${JSON.stringify(response.data.issues, null, 2)}`);
-        return response.data.issues || [];
+        const issues = response.data.issues || [];
+        
+        // Store parent task keys
+        const parentTasks = new Set(issues.map((task: any) => task.fields.parent?.key).filter(Boolean));
+
+        // Filter out parent tasks if they have subtasks
+        const filteredTasks = issues.filter((task: any) => {
+            if (task.fields.parent) {
+                return true; // Keep subtasks
+            }
+            return !parentTasks.has(task.key); // Keep only tasks that aren't parents
+        });
+
+        console.log(`Filtered Issues: ${JSON.stringify(filteredTasks, null, 2)}`);
+        return filteredTasks;
     } catch (error: any) {
         console.error(`Error fetching backlog tasks: ${error.message}`);
         if (error.response) {
@@ -69,6 +81,7 @@ async function getBacklogTasks(): Promise<any[]> {
         return [];
     }
 }
+
 
 async function generateReport() {
     const today = moment();
