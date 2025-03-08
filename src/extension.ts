@@ -53,22 +53,18 @@ async function getYesterdayTasks(): Promise<any[]> {
 
 async function getBacklogTasks(): Promise<any[]> {
     const jql = `assignee = '${JIRA_USERNAME}' AND status IN ('To Do', 'In Progress')`;
-    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,parent`;
-    console.log(`Requesting: ${url}`);
-
+    // Include only subtasks or tasks or story without subtasks 
+    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,subtasks`;
     try {
         const response = await axios.get(url, { headers });
         const issues = response.data.issues || [];
-        
-        // Store parent task keys
-        const parentTasks = new Set(issues.map((task: any) => task.fields.parent?.key).filter(Boolean));
 
-        // Filter out parent tasks if they have subtasks
         const filteredTasks = issues.filter((task: any) => {
-            if (task.fields.parent) {
-                return true; // Keep subtasks
-            }
-            return !parentTasks.has(task.key); // Keep only tasks that aren't parents
+            const isSubtask = !!task.fields.parent; // Has a parent field (not included in fields, but checking for safety)
+            const hasSubtasks = task.fields.subtasks && task.fields.subtasks.length > 0; // Has subtasks
+
+            // Keep only if it’s not a subtask and has no subtasks
+            return !isSubtask && !hasSubtasks;
         });
 
         console.log(`Filtered Issues: ${JSON.stringify(filteredTasks, null, 2)}`);
@@ -85,7 +81,6 @@ async function getBacklogTasks(): Promise<any[]> {
 
 async function generateReport() {
     const today = moment();
-    const yesterday = getYesterday();
     
     const label = today.day() === 1 ? "Last Friday" : "Yesterday";
 
