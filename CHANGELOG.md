@@ -1,4 +1,6 @@
 # Changelog
+## [0.0.92]
+- Feat: Additional Add report generate to clipboard feature
 
 ## [0.0.91] - 2025-03-09
 ###Fixed
