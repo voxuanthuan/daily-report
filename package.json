@@ -2,7 +2,7 @@
   "name": "jira-daily-report",
   "displayName": "jira-daily-report",
   "description": "Generates a daily Jira report for yesterday and today",
-  "version": "0.0.91",
+  "version": "0.0.93",
   "publisher": "thuanvo",
   "icon": "images/icon.png",
   "repository": {
@@ -41,6 +41,11 @@
           "type": "string",
           "default": "",
           "description": "Your Jira API token (generate from Atlassian account)"
+        },
+        "jiraDailyReport.autoClipboard": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically copy the generated report to clipboard"
         }
       }
     }
