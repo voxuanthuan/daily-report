@@ -81,36 +81,60 @@ async function getBacklogTasks(): Promise<any[]> {
 
 async function generateReport() {
     const today = moment();
-    
     const label = today.day() === 1 ? "Last Friday" : "Yesterday";
+
+    // Get configuration
+    const config = vscode.workspace.getConfiguration('jiraDailyReport');
+    const autoClipboard = config.get('autoClipboard', false); // Default to false
 
     const yesterdayTasks = await getYesterdayTasks();
     const backlogTasks = await getBacklogTasks();
 
-    let report = `Hi everyone,\n${label}\n`;
+    // Construct the report text
+    let reportText = `Hi everyone,\n${label}\n`;
     if (yesterdayTasks.length > 0) {
         for (const task of yesterdayTasks) {
-            report += `- ${task.key}: ${task.fields.summary}\n`;
+            reportText += `- ${task.key}: ${task.fields.summary}\n`;
         }
     } else {
-        report += '- No tasks logged.\n';
+        reportText += '- No tasks logged.\n';
     }
 
-    report += 'Today\n';
+    reportText += 'Today\n';
     if (backlogTasks.length > 0) {
         for (const task of backlogTasks) {
-            report += `- ${task.key}: ${task.fields.summary}\n`;
+            reportText += `- ${task.key}: ${task.fields.summary}\n`;
         }
     } else {
-        report += '- No tasks planned.\n';
+        reportText += '- No tasks planned.\n';
+    }
+    reportText += 'No blockers\n';
+
+    // Prepare final report
+    let finalReport = reportText;
+    let notificationMessage = 'Daily report generated!';
+
+    // Handle clipboard if enabled
+    if (autoClipboard) {
+        finalReport += '\n\n✅ Report copied to clipboard!'; // Added checkmark icon and new text
+        try {
+            await vscode.env.clipboard.writeText(reportText);
+            notificationMessage = 'Daily report generated and copied to clipboard!';
+        } catch (error) {
+            vscode.window.showErrorMessage('Failed to copy report to clipboard');
+            console.error('Clipboard error:', error);
+            notificationMessage = 'Daily report generated (clipboard copy failed)';
+        }
     }
 
-    report += 'No blockers\n';
-
+    // Show in output channel
     const outputChannel = vscode.window.createOutputChannel('Jira Daily Report');
     outputChannel.clear();
-    outputChannel.append(report);
+    outputChannel.append(finalReport);
     outputChannel.show();
+
+    // Show notification
+    vscode.window.showInformationMessage(notificationMessage);
 }
 
 // Function to read CHANGELOG.md
