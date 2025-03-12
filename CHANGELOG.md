@@ -1,4 +1,8 @@
 # Changelog
+## [0.0.94]
+- Fix: Issue related to check parent have subtask (edge case subtask is "Test execution" still count this task as subtask)
+- Feaure: Generate todo list for reference
+
 ## [0.0.93]
 - Feat: Additional Add report generate to clipboard feature
 

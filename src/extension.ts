@@ -17,14 +17,10 @@ const headers = {
 /**
  * Returns yesterday’s date as a formatted string (YYYY-MM-DD).
  * If the given reference date (or today, if omitted) is Monday, it returns the previous Friday.
- *
- * @param referenceDate Optional moment.Moment to use as “today” for testing purposes.
  */
 export function getYesterday(referenceDate?: moment.Moment): string {
-    // Use the provided reference date or the current date
     const today = referenceDate ? moment(referenceDate) : moment();
-    // In moment, Sunday = 0, Monday = 1, etc.
-    if (today.day() === 1) { // if Monday, subtract 3 days to get Friday
+    if (today.day() === 1) { // Monday, get Friday
         return today.subtract(3, 'days').format('YYYY-MM-DD');
     } else {
         return today.subtract(1, 'days').format('YYYY-MM-DD');
@@ -51,44 +47,67 @@ async function getYesterdayTasks(): Promise<any[]> {
     }
 }
 
-async function getBacklogTasks(): Promise<any[]> {
-    const jql = `assignee = '${JIRA_USERNAME}' AND status IN ('To Do', 'In Progress')`;
-    // Include only subtasks or tasks or story without subtasks 
-    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,subtasks`;
+async function getBacklogTasks(): Promise<{ inProgress: any[]; open: any[] }> {
+    const jql = `assignee = '${JIRA_USERNAME}' AND status IN ('Open', 'In Progress')`;
+    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,subtasks,status,parent`;
     try {
         const response = await axios.get(url, { headers });
         const issues = response.data.issues || [];
 
         const filteredTasks = issues.filter((task: any) => {
-            const isSubtask = !!task.fields.parent; // Has a parent field (not included in fields, but checking for safety)
-            const hasSubtasks = task.fields.subtasks && task.fields.subtasks.length > 0; // Has subtasks
-
-            // Keep only if it’s not a subtask and has no subtasks
-            return !isSubtask && !hasSubtasks;
+            const isSubtask = !!task.fields.parent;
+            const meaningfulSubtasks = (task.fields.subtasks || []).filter(
+                (subtask: any) => subtask.fields.summary !== 'Test execution'
+            );
+            const hasMeaningfulSubtasks = meaningfulSubtasks.length > 0;
+            return !isSubtask && !hasMeaningfulSubtasks;
         });
 
-        console.log(`Filtered Issues: ${JSON.stringify(filteredTasks, null, 2)}`);
-        return filteredTasks;
+        // Split tasks into In Progress and Open
+        const inProgress = filteredTasks.filter((task: any) => task.fields.status.name === 'In Progress');
+        const open = filteredTasks.filter((task: any) => task.fields.status.name === 'Open');
+
+        console.log(`Filtered In Progress: ${JSON.stringify(inProgress, null, 2)}`);
+        console.log(`Filtered Open: ${JSON.stringify(open, null, 2)}`);
+        return { inProgress, open };
     } catch (error: any) {
         console.error(`Error fetching backlog tasks: ${error.message}`);
         if (error.response) {
             console.error(`Response: ${JSON.stringify(error.response.data)}`);
         }
-        return [];
+        return { inProgress: [], open: [] };
     }
 }
 
+async function showTodoList() {
+    const { open } = await getBacklogTasks();
+
+    let todoText = `Current Todo Tasks (Assigned to ${JIRA_USERNAME})\n`;
+    if (open.length > 0) {
+        for (const task of open) {
+            todoText += `- ${task.key}: ${task.fields.summary}\n`;
+        }
+    } else {
+        todoText += '- No tasks in backlog\n';
+    }
+
+    const outputChannel = vscode.window.createOutputChannel('Jira Todo List');
+    outputChannel.clear();
+    outputChannel.append(todoText);
+    outputChannel.show();
+
+    vscode.window.showInformationMessage('Todo list displayed in output channel for reference');
+}
 
 async function generateReport() {
     const today = moment();
     const label = today.day() === 1 ? "Last Friday" : "Yesterday";
 
-    // Get configuration
     const config = vscode.workspace.getConfiguration('jiraDailyReport');
-    const autoClipboard = config.get('autoClipboard', false); // Default to false
+    const autoClipboard = config.get('autoClipboard', false);
 
     const yesterdayTasks = await getYesterdayTasks();
-    const backlogTasks = await getBacklogTasks();
+    const { inProgress, open } = await getBacklogTasks();
 
     // Construct the report text
     let reportText = `Hi everyone,\n${label}\n`;
@@ -101,22 +120,35 @@ async function generateReport() {
     }
 
     reportText += 'Today\n';
-    if (backlogTasks.length > 0) {
-        for (const task of backlogTasks) {
+    if (inProgress.length > 0) {
+        for (const task of inProgress) {
             reportText += `- ${task.key}: ${task.fields.summary}\n`;
         }
     } else {
         reportText += '- No tasks planned.\n';
     }
-    reportText += 'No blockers\n';
 
+    
+    reportText += 'No blockers\n';
+    
     // Prepare final report
     let finalReport = reportText;
+
+    finalReport += '- Report copy to Clipboard! ✅';
+
     let notificationMessage = 'Daily report generated!';
 
-    // Handle clipboard if enabled
+    finalReport += '\n\nTo Do:\n';
+
+    if (open.length > 0) {
+        for (const task of open) {
+            finalReport += `- ${task.key}: ${task.fields.summary}\n`;
+        }
+    } else {
+        finalReport += '- No tasks available.\n';
+    }
+
     if (autoClipboard) {
-        finalReport += '\n\n✅ Report copied to clipboard!'; // Added checkmark icon and new text
         try {
             await vscode.env.clipboard.writeText(reportText);
             notificationMessage = 'Daily report generated and copied to clipboard!';
@@ -127,13 +159,11 @@ async function generateReport() {
         }
     }
 
-    // Show in output channel
     const outputChannel = vscode.window.createOutputChannel('Jira Daily Report');
     outputChannel.clear();
     outputChannel.append(finalReport);
     outputChannel.show();
 
-    // Show notification
     vscode.window.showInformationMessage(notificationMessage);
 }
 
@@ -159,23 +189,17 @@ function showChangelog(context: vscode.ExtensionContext) {
         outputChannel.clear();
         outputChannel.append(`Extension updated to v${currentVersion}!\n\n${changelog}`);
         outputChannel.show();
-
-        // Update the stored version
         context.globalState.update('lastVersion', currentVersion);
     }
 }
 
-
-
 export function activate(context: vscode.ExtensionContext) {
     console.log('Jira Daily Report extension is now active!');
-
-    // Show changelog if version changed
     showChangelog(context);
 
-    // Register the command
     const disposable = vscode.commands.registerCommand('jiraDailyReport.generate', generateReport);
-    context.subscriptions.push(disposable);
+    const todoDisposable = vscode.commands.registerCommand('jiraDailyReport.showTodo', showTodoList);
+    context.subscriptions.push(disposable, todoDisposable);
 }
 
 export function deactivate() {}
