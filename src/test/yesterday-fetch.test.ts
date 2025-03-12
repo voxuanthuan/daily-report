@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import moment from 'moment';
-import { getYesterday } from '../extension';
+import { getPreviousWorkday } from '../extension';
 
 suite('Date Utility Tests', () => {
     test('Normal day: should return yesterday (subtract 1 day)', () => {
@@ -8,7 +8,7 @@ suite('Date Utility Tests', () => {
         // Let's use Wednesday, 2021-09-15.
         const reference = moment('2021-09-15');
         // Expected yesterday is Tuesday, 2021-09-14.
-        const result = getYesterday(reference);
+        const result = getPreviousWorkday(reference);
         assert.strictEqual(result, '2021-09-14');
     });
 
@@ -17,7 +17,7 @@ suite('Date Utility Tests', () => {
         // Let's use Monday, 2021-09-13.
         const reference = moment('2021-09-13');
         // Expected previous Friday is 2021-09-10.
-        const result = getYesterday(reference);
+        const result = getPreviousWorkday(reference);
         assert.strictEqual(result, '2021-09-10');
     });
 });
