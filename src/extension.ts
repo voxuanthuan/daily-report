@@ -8,198 +8,174 @@ const config = vscode.workspace.getConfiguration('grappleDailyReport');
 const JIRA_SERVER = config.get('jiraServer') as string;
 const JIRA_USERNAME = config.get('username') as string;
 const JIRA_API_TOKEN = config.get('apiToken') as string;
-const auth = Buffer.from(`${JIRA_USERNAME}:${JIRA_API_TOKEN}`).toString('base64');
-const headers = {
-    'Authorization': `Basic ${auth}`,
-    'Content-Type': 'application/json'
-};
+const authHeader = `Basic ${Buffer.from(`${JIRA_USERNAME}:${JIRA_API_TOKEN}`).toString('base64')}`;
+const apiHeaders = { 'Authorization': authHeader, 'Content-Type': 'application/json' };
 
-/**
- * Returns yesterday’s date as a formatted string (YYYY-MM-DD).
- * If the given reference date (or today, if omitted) is Monday, it returns the previous Friday.
- */
-export function getYesterday(referenceDate?: moment.Moment): string {
-    const today = referenceDate ? moment(referenceDate) : moment();
-    if (today.day() === 1) { // Monday, get Friday
-        return today.subtract(3, 'days').format('YYYY-MM-DD');
-    } else {
-        return today.subtract(1, 'days').format('YYYY-MM-DD');
-    }
+export function getPreviousWorkday(referenceDate?: moment.Moment): string {
+    const date = referenceDate ? moment(referenceDate) : moment();
+    return date.day() === 1 ? date.subtract(3, 'days').format('YYYY-MM-DD') : date.subtract(1, 'days').format('YYYY-MM-DD');
 }
 
-async function getYesterdayTasks(): Promise<any[]> {
-    const yesterday = getYesterday();
-    const jql = `assignee = '${JIRA_USERNAME}' AND worklogDate = '${yesterday}'`;
-    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}`;
-    console.log(`Requesting: ${url}`);
-    
+async function fetchPreviousWorkdayTasks(): Promise<any[]> {
+    const previousDay = getPreviousWorkday();
+    const jql = `assignee = '${JIRA_USERNAME}' AND worklogDate = '${previousDay}'`;
+    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,subtasks,status,worklog`;
+
     try {
-        const response = await axios.get(url, { headers });
-        console.log(`Response: Total issues found: ${response.data.total}`);
-        console.log(`Issues: ${JSON.stringify(response.data.issues, null, 2)}`);
+        const response = await axios.get(url, { headers: apiHeaders });
+        console.log(`Fetched ${response.data.total} issues for ${previousDay}`);
         return response.data.issues || [];
     } catch (error: any) {
-        console.error(`Error fetching yesterday's tasks: ${error.message}`);
-        if (error.response) {
-            console.error(`Response: ${JSON.stringify(error.response.data)}`);
-        }
+        console.error(`Failed to fetch tasks for ${previousDay}: ${error.message}`, error.response?.data);
         return [];
     }
 }
 
-async function getBacklogTasks(): Promise<{ inProgress: any[]; open: any[] }> {
+async function fetchBacklogTasks(): Promise<{ inProgress: any[]; open: any[] }> {
     const jql = `assignee = '${JIRA_USERNAME}' AND status IN ('Open', 'In Progress')`;
-    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,subtasks,status,parent`;
+    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,subtasks,status,worklog`;
+
     try {
-        const response = await axios.get(url, { headers });
+        const response = await axios.get(url, { headers: apiHeaders });
         const issues = response.data.issues || [];
 
-        const filteredTasks = issues.filter((task: any) => {
-            const isSubtask = !!task.fields.parent;
-            const meaningfulSubtasks = (task.fields.subtasks || []).filter(
-                (subtask: any) => subtask.fields.summary !== 'Test execution'
-            );
-            const hasMeaningfulSubtasks = meaningfulSubtasks.length > 0;
-            return !isSubtask && !hasMeaningfulSubtasks;
+        const tasksWithoutMeaningfulSubtasks = issues.filter((task: any) => {
+            const subtasks = (task.fields.subtasks || []).filter((subtask: any) => subtask.fields.summary !== 'Test execution');
+            return subtasks.length === 0;
         });
 
-        // Split tasks into In Progress and Open
-        const inProgress = filteredTasks.filter((task: any) => task.fields.status.name === 'In Progress');
-        const open = filteredTasks.filter((task: any) => task.fields.status.name === 'Open');
-
-        console.log(`Filtered In Progress: ${JSON.stringify(inProgress, null, 2)}`);
-        console.log(`Filtered Open: ${JSON.stringify(open, null, 2)}`);
-        return { inProgress, open };
+        return {
+            inProgress: tasksWithoutMeaningfulSubtasks.filter((task: any) => task.fields.status.name === 'In Progress'),
+            open: tasksWithoutMeaningfulSubtasks.filter((task: any) => task.fields.status.name === 'Open'),
+        };
     } catch (error: any) {
-        console.error(`Error fetching backlog tasks: ${error.message}`);
-        if (error.response) {
-            console.error(`Response: ${JSON.stringify(error.response.data)}`);
-        }
+        console.error(`Failed to fetch backlog tasks: ${error.message}`, error.response?.data);
         return { inProgress: [], open: [] };
     }
 }
 
-async function showTodoList() {
-    const { open } = await getBacklogTasks();
+async function displayTodoList() {
+    const { open } = await fetchBacklogTasks();
+    const output = vscode.window.createOutputChannel('Jira Todo List');
+    output.clear();
 
-    let todoText = `Current Todo Tasks (Assigned to ${JIRA_USERNAME})\n`;
-    if (open.length > 0) {
-        for (const task of open) {
-            todoText += `- ${task.key}: ${task.fields.summary}\n`;
-        }
-    } else {
-        todoText += '- No tasks in backlog\n';
-    }
+    output.appendLine(`Current Todo Tasks (Assigned to ${JIRA_USERNAME})`);
+    open.length > 0
+        ? open.forEach((task) => output.appendLine(`- ${task.key}: ${task.fields.summary}`))
+        : output.appendLine('- No tasks in backlog');
 
-    const outputChannel = vscode.window.createOutputChannel('Jira Todo List');
-    outputChannel.clear();
-    outputChannel.append(todoText);
-    outputChannel.show();
-
-    vscode.window.showInformationMessage('Todo list displayed in output channel for reference');
+    output.show();
+    vscode.window.showInformationMessage('Todo list displayed in output channel');
 }
 
-async function generateReport() {
+function calculateWorklogHours(task: any, date: string): number {
+    const worklogs = task.fields.worklog?.worklogs || [];
+    const totalSeconds = worklogs
+        .filter((log: any) => moment(log.started).format('YYYY-MM-DD') === date)
+        .reduce((sum: number, log: any) => sum + (log.timeSpentSeconds || 0), 0);
+    return Math.round(totalSeconds / 3600);
+}
+
+async function generateDailyReport() {
     const today = moment();
-    const label = today.day() === 1 ? "Last Friday" : "Yesterday";
+    const isMonday = today.day() === 1;
+    const previousDayLabel = isMonday ? 'Last Friday' : 'Yesterday';
+    const previousDay = getPreviousWorkday();
+    const autoClipboard = config.get('autoClipboard', true);
 
-    const config = vscode.workspace.getConfiguration('jiraDailyReport');
-    const autoClipboard = config.get('autoClipboard', false);
+    const [yesterdayTasks, { inProgress, open }] = await Promise.all([fetchPreviousWorkdayTasks(), fetchBacklogTasks()]);
+    const userDisplayName = await fetchUserDisplayName();
 
-    const yesterdayTasks = await getYesterdayTasks();
-    const { inProgress, open } = await getBacklogTasks();
+    let report = `Hi everyone,\n${previousDayLabel}\n`;
+    const totalHours = yesterdayTasks.reduce((sum, task) => sum + calculateWorklogHours(task, previousDay), 0);
 
-    // Construct the report text
-    let reportText = `Hi everyone,\n${label}\n`;
-    if (yesterdayTasks.length > 0) {
-        for (const task of yesterdayTasks) {
-            reportText += `- ${task.key}: ${task.fields.summary}\n`;
-        }
-    } else {
-        reportText += '- No tasks logged.\n';
-    }
+    report += yesterdayTasks.length > 0
+        ? yesterdayTasks.map((task) => `- ${task.key}: ${task.fields.summary} - ${calculateWorklogHours(task, previousDay)}h`).join('\n') + '\n'
+        : '- No tasks logged.\n';
 
-    reportText += 'Today\n';
-    if (inProgress.length > 0) {
-        for (const task of inProgress) {
-            reportText += `- ${task.key}: ${task.fields.summary}\n`;
-        }
-    } else {
-        reportText += '- No tasks planned.\n';
-    }
+    report += 'Today\n';
+    report += inProgress.length > 0
+        ? inProgress.map((task) => `- ${task.key}: ${task.fields.summary}`).join('\n') + '\n'
+        : '- No tasks planned.\n';
 
-    
-    reportText += 'No blockers\n';
-    
-    // Prepare final report
-    let finalReport = reportText;
+    report += 'No blockers\n\n';
 
-    finalReport += '- Report copy to Clipboard! ✅';
+    let finalReport = report;
+    finalReport += '-------------------------------------------------------------';
+    finalReport += '\n\nTo Do List\n';
+    finalReport += open.length > 0
+        ? open.map((task) => `- ${task.key}: ${task.fields.summary}`).join('\n')
+        : '- No tasks available.';
+    finalReport += '\n\nNotes';
 
-    let notificationMessage = 'Daily report generated!';
+    finalReport += totalHours < 8
+    ? `\n- 👨🏼 Ha Nguyen: thanh niên @${userDisplayName} qua làm gì mới log có ${totalHours}h`
+    : totalHours === 8
+    ? '\n- 🕐 Logwork: completed 👍'
+    : '\n- 🕐 Logwork: exceed 8h ⛔';
 
-    finalReport += '\n\nTo Do:\n';
+    finalReport += '\n- 📋 Clipboard: The report is copied to clipboard';
 
-    if (open.length > 0) {
-        for (const task of open) {
-            finalReport += `- ${task.key}: ${task.fields.summary}\n`;
-        }
-    } else {
-        finalReport += '- No tasks available.\n';
-    }
+    const output = vscode.window.createOutputChannel('Jira Daily Report');
+    output.clear();
+    output.append(finalReport);
+    output.show();
 
     if (autoClipboard) {
         try {
-            await vscode.env.clipboard.writeText(reportText);
-            notificationMessage = 'Daily report generated and copied to clipboard!';
+            await vscode.env.clipboard.writeText(report);
+            vscode.window.showInformationMessage('Daily report generated and copied to clipboard!');
         } catch (error) {
-            vscode.window.showErrorMessage('Failed to copy report to clipboard');
-            console.error('Clipboard error:', error);
-            notificationMessage = 'Daily report generated (clipboard copy failed)';
+            console.error('Failed to copy to clipboard:', error);
+            vscode.window.showErrorMessage('Daily report generated (clipboard copy failed)');
         }
+    } else {
+        vscode.window.showInformationMessage('Daily report generated!');
     }
-
-    const outputChannel = vscode.window.createOutputChannel('Jira Daily Report');
-    outputChannel.clear();
-    outputChannel.append(finalReport);
-    outputChannel.show();
-
-    vscode.window.showInformationMessage(notificationMessage);
 }
 
-// Function to read CHANGELOG.md
-function getChangelog(context: vscode.ExtensionContext): string {
+async function fetchUserDisplayName(): Promise<string> {
+    try {
+        const response = await axios.get(`${JIRA_SERVER}/rest/api/3/myself`, { headers: apiHeaders });
+        return response.data.displayName || JIRA_USERNAME.split('@')[0];
+    } catch (error) {
+        console.error('Failed to fetch user info:', error);
+        return JIRA_USERNAME.split('@')[0];
+    }
+}
+
+function readChangelog(context: vscode.ExtensionContext): string {
     const changelogPath = path.join(context.extensionPath, 'CHANGELOG.md');
     try {
         return fs.readFileSync(changelogPath, 'utf8');
     } catch (error) {
         console.error('Error reading CHANGELOG.md:', error);
-        return 'No changelog available. Please ensure CHANGELOG.md exists in the extension directory.';
+        return 'No changelog available.';
     }
 }
 
-// Function to display the changelog
-function showChangelog(context: vscode.ExtensionContext) {
+function displayChangelog(context: vscode.ExtensionContext) {
     const currentVersion = context.extension.packageJSON.version;
     const lastVersion = context.globalState.get('lastVersion') as string | undefined;
 
     if (lastVersion !== currentVersion) {
-        const changelog = getChangelog(context);
-        const outputChannel = vscode.window.createOutputChannel('Jira Daily Report Changelog');
-        outputChannel.clear();
-        outputChannel.append(`Extension updated to v${currentVersion}!\n\n${changelog}`);
-        outputChannel.show();
+        const changelog = readChangelog(context);
+        const output = vscode.window.createOutputChannel('Jira Daily Report Changelog');
+        output.clear();
+        output.append(`Extension updated to v${currentVersion}!\n\n${changelog}`);
+        output.show();
         context.globalState.update('lastVersion', currentVersion);
     }
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Jira Daily Report extension is now active!');
-    showChangelog(context);
+    console.log('Jira Daily Report extension activated!');
+    displayChangelog(context);
 
-    const disposable = vscode.commands.registerCommand('jiraDailyReport.generate', generateReport);
-    const todoDisposable = vscode.commands.registerCommand('jiraDailyReport.showTodo', showTodoList);
-    context.subscriptions.push(disposable, todoDisposable);
+    context.subscriptions.push(
+        vscode.commands.registerCommand('jiraDailyReport.generate', generateDailyReport),
+        vscode.commands.registerCommand('jiraDailyReport.showTodo', displayTodoList)
+    );
 }
 
 export function deactivate() {}
