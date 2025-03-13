@@ -71,7 +71,7 @@ async function displayTodoList() {
 function calculateWorklogHours(task: any, date: string): number {
     const worklogs = task.fields.worklog?.worklogs || [];
     const totalSeconds = worklogs
-        .filter((log: any) => moment(log.started).format('YYYY-MM-DD') === date)
+        .filter((log: any) => moment(log.created).format('YYYY-MM-DD') === date)
         .reduce((sum: number, log: any) => sum + (log.timeSpentSeconds || 0), 0);
     return Math.round(totalSeconds / 3600);
 }
@@ -90,7 +90,7 @@ async function generateDailyReport() {
     const totalHours = yesterdayTasks.reduce((sum, task) => sum + calculateWorklogHours(task, previousDay), 0);
 
     report += yesterdayTasks.length > 0
-        ? yesterdayTasks.map((task) => `- ${task.key}: ${task.fields.summary} - ${calculateWorklogHours(task, previousDay)}h`).join('\n') + '\n'
+        ? yesterdayTasks.map((task) => `- ${task.key}: ${task.fields.summary}`).join('\n') + '\n'
         : '- No tasks logged.\n';
 
     report += 'Today\n';
