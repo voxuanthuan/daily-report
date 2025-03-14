@@ -7,7 +7,8 @@ The **Jira Daily Report** extension for Visual Studio Code helps you generate da
 
 ## Installation
 1. Install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=thuanvo.jira-daily-report).
-2. Or Install from Ext: `ext install thuanvo.jira-daily-report`
+2. Or Launch VS Code Quick Open (Ctrl+P), paste the following command, and press enter.
+- `ext install thuanvo.jira-daily-report`
 
 
 ### Configure Your Jira Settings
@@ -17,8 +18,12 @@ The **Jira Daily Report** extension for Visual Studio Code helps you generate da
 
 ### Step 2: Generate Your First Report
 Once configured, you’re ready to use the extension:
-1. Open the **Command Palette** (`Ctrl+Shift+P` or `Cmd+Shift+P`).
-2. Type `Generate Jira Daily Report`
+   -1. Open the **Command Palette** (`Ctrl+Shift+P` or `Cmd+Shift+P`).
+   -2. Type `Generate Jira Daily Report`
+
+### Slack Formatting Guide
+- ( **- → •** ) 
+- [Slack Formatting Guide](https://slack.com/intl/en-gb/help/articles/360039953113-Set-your-message-formatting-preference)
 
 ## Contributing
 
