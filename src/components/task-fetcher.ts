@@ -74,7 +74,7 @@ async function fetchBacklogTasks(): Promise<{ inProgress: any[]; open: any[] }> 
 function calculateWorklogHours(task: any, date: string): number {
     const worklogs = task.fields.worklog?.worklogs || [];
     const totalSeconds = worklogs
-        .filter((log: any) => moment(log.created).format('YYYY-MM-DD') === date)
+        .filter((log: any) => moment(log.started).format('YYYY-MM-DD') === date)
         .reduce((sum: number, log: any) => sum + (log.timeSpentSeconds || 0), 0);
     return Math.round(totalSeconds / 3600);
 }
