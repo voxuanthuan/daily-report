@@ -65,10 +65,10 @@ export function buildTodoList(openTasks: any[]): string {
 
 export function buildTotalHoursNote(totalHours: number, userDisplayName: string): string {
   return totalHours < 8
-      ? `- 👨🏼 Ha Nguyen: tn @${userDisplayName} qua lm gif mois log cos ${totalHours}h\n`
+      ? `- 🕐 Last Logwork: ${totalHours}h \n`
       : totalHours === 8
-      ? '- 🕐 Logwork: completed 👍\n'
-      : '- 🕐 Logwork: exceed 8h ⛔\n';
+      ? '- 🕐 Last Logwork: completed 👍\n'
+      : `- 🕐 Last Logwork: (${totalHours}) > 8h ⛔\n`;
 }
 
 export function buildNotes(totalHours: number, userDisplayName: string): string {
@@ -78,6 +78,7 @@ export function buildNotes(totalHours: number, userDisplayName: string): string 
             - Bug > task > sub-task > Story
             - Limit 10 `;
   notes += '\n- 📋 Clipboard: The report is copied to clipboard';
+  notes += '\n- 📅 TimeLog: Logwork just for reference, we got some edgecase can not fix this time. (Qc assign its self, tempo app time tracking)';
 
   return notes;
 }
