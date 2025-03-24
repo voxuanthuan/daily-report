@@ -63,7 +63,7 @@ export function buildTodoList(openTasks: any[]): string {
   return todo;
 }
 
-export function buildTotalHoursNote(totalHours: number, userDisplayName: string): string {
+export function buildTotalHoursNote(totalHours: number): string {
   return totalHours < 8
       ? `- 🕐 Last Logwork: ${totalHours}h \n`
       : totalHours === 8
@@ -83,6 +83,6 @@ export function buildNotes(totalHours: number, userDisplayName: string): string 
   return notes;
 }
 
-export function combineReport(mainReport: string, timeLog: string, todoList: string, remainingNotes: string): string {
-  return `${mainReport}${timeLog}${todoList}${remainingNotes}`;
+export function combineReport(mainReport: string, timeLog: string, todoList: string, worklogs: string): string {
+  return `${mainReport}${timeLog}${todoList}${worklogs}`;
 }

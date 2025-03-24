@@ -1,15 +1,7 @@
 import axios from 'axios';
 import moment from 'moment';
-import * as vscode from 'vscode';
 import { getPreviousWorkday } from './date-utils';
-
-// Jira configuration
-const config = vscode.workspace.getConfiguration('grappleDailyReport');
-const JIRA_SERVER = config.get('jiraServer') as string;
-const JIRA_USERNAME = config.get('username') as string;
-const JIRA_API_TOKEN = config.get('apiToken') as string;
-const authHeader = `Basic ${Buffer.from(`${JIRA_USERNAME}:${JIRA_API_TOKEN}`).toString('base64')}`;
-const apiHeaders = { 'Authorization': authHeader, 'Content-Type': 'application/json' };
+import { apiHeaders, JIRA_SERVER, JIRA_USERNAME } from './config-utils';
 
 export async function fetchAllTasks(): Promise<{ yesterdayTasks: any[]; inProgress: any[]; open: any[] }> {
     const [yesterdayTasks, { inProgress, open }] = await Promise.all([
@@ -35,7 +27,7 @@ export async function fetchUserDisplayName(): Promise<string> {
 
 async function fetchPreviousWorkdayTasks(): Promise<any[]> {
     const previousDay = getPreviousWorkday();
-    const jql = `assignee = '${JIRA_USERNAME}' AND worklogDate = '${previousDay}'`;
+    const jql = `assignee = '${JIRA_USERNAME}' AND worklogDate = '${previousDay}' AND status != 'Open' AND worklogAuthor = '${JIRA_USERNAME}'`;
     const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,subtasks,status,worklog`;
 
     try {
@@ -74,7 +66,9 @@ async function fetchBacklogTasks(): Promise<{ inProgress: any[]; open: any[] }> 
 function calculateWorklogHours(task: any, date: string): number {
     const worklogs = task.fields.worklog?.worklogs || [];
     const totalSeconds = worklogs
-        .filter((log: any) => moment(log.started).format('YYYY-MM-DD') === date)
+        .filter((log: any) => {
+            return moment(log.created).format('YYYY-MM-DD') === date && (log.author?.displayName === 'Tempo Timesheets' || log.author?.emailAddress === JIRA_USERNAME);
+        })
         .reduce((sum: number, log: any) => sum + (log.timeSpentSeconds || 0), 0);
     return Math.round(totalSeconds / 3600);
 }
