@@ -2,7 +2,7 @@
   "name": "jira-daily-report",
   "displayName": "jira-daily-report",
   "description": "Generates a Daily Report from Jira",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "thuanvo",
   "icon": "images/icon.png",
   "repository": {
