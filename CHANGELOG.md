@@ -1,7 +1,7 @@
 # Changelog
-## [0.0.95]
-- Feature: Appear time log in the end of the report
-- Feature: Add time log for each task
+## [1.0.4]
+- Feature: Apply Tempo Sheet
+- 🐛 Bug Fix: Show correct List "Yesterday" Task
 
 ## [0.0.94]
 - Fix: Issue related to check parent have subtask (edge case subtask is "Test execution" still count this task as subtask)

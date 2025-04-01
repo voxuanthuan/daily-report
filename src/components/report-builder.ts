@@ -1,5 +1,4 @@
-export function buildMainReport(previousDayLabel: string, tasks: { yesterdayTasks: any[]; inProgress: any[] }): string {
-  const { yesterdayTasks, inProgress } = tasks;
+export function buildMainReport(previousDayLabel: string, inProgress: any[], yesterdayTasks: any[]): string {
   let report = `Hi everyone,\n${previousDayLabel}\n`;
   
   report += yesterdayTasks.length > 0
@@ -57,7 +56,7 @@ export function buildTodoList(openTasks: any[]): string {
           default:
               icon = '🟩';
       }
-      return ` ${icon} - ${task.key}: ${task.fields.summary}`;
+      return ` ${icon} - ${task.key}: ${task?.fields?.summary}`;
   }).join('\n');
 
   return todo;
