@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
 import moment from 'moment';
-import { apiHeaders, JIRA_API_TOKEN, JIRA_SERVER, JIRA_USERNAME } from './config-utils';
+import { apiHeaders, JIRA_API_TOKEN, JIRA_SERVER, JIRA_USERNAME, WHO_AM_I, IAM } from './config-utils';
 import TempoFetcher from './tempo/fetcher';
+
+const IS_QC = WHO_AM_I === IAM.QC;
 
 const GUIDE_GENERATE_TOKEN = 'https://confluence.atlassian.com/cloud/api-tokens-938839638.html';
 
@@ -35,7 +37,7 @@ export async function fetchUserDisplayName(): Promise<any> {
 
 async function fetchBacklogTasks(): Promise<{ inProgress: any[]; open: any[] }> {
     const jql = `assignee = '${JIRA_USERNAME}' AND status IN ('Open', 'In Progress')`;
-    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,subtasks,status,worklog,priority,issuetype`;
+    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,subtasks,status,worklog,priority,issuetype${IS_QC ? ',parent' : ''}`;
 
     try {
         const response = await axios.get(url, { headers: apiHeaders });
@@ -88,7 +90,7 @@ async function fetchJiraIssueDetails(issueKey: string): Promise<JiraIssue | null
       const errorMessage = `Jira API token is missing. Please configure Jira Tempo API token in settings. See ${GUIDE_GENERATE_TOKEN} for more info.`;
       vscode.window.showErrorMessage(errorMessage);
     }
-    const url = `${JIRA_SERVER}/rest/api/3/issue/${issueKey}?fields=summary,status`;
+    const url = `${JIRA_SERVER}/rest/api/3/issue/${issueKey}?fields=summary,status,issueType,priority${WHO_AM_I === IAM.QC ? ',parent' : ''}`;
     try {
       const response = await axios.get(url, { headers: apiHeaders });
       return response.data;
