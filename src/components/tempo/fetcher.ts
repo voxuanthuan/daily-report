@@ -50,7 +50,7 @@ class TempoFetcher {
     const days: moment.Moment[] = [];
     let currentDate = today.clone();
 
-    while (days.length < 6) {
+    while (days.length < 10) {
       const weekday = currentDate.isoWeekday();
       if (weekday <= 5) { // Monday (1) to Friday (5), exclude Saturday (6) and Sunday (7)
         days.unshift(currentDate.clone());

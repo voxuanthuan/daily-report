@@ -2,7 +2,7 @@
   "name": "jira-daily-report",
   "displayName": "jira-daily-report",
   "description": "Generates a Daily Report from Jira",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "thuanvo",
   "icon": "images/icon.png",
   "repository": {
@@ -22,6 +22,10 @@
       {
         "command": "jiraDailyReport.generate",
         "title": "Generate Jira Daily Report"
+      },
+      {
+        "command": "jiraDailyReport.open",
+        "title": "Open Ticket"
       }
     ],
     "configuration": {
@@ -45,7 +49,12 @@
         "grappleDailyReport.jiraTempoToken": {
           "type": "string",
           "default": "",
-          "description": "Your Jira Tempo API token (Tempo > Setting > Data Access)"
+          "description": "Your Jira Tempo API token (Tempo > Setting > Data Access > API Intergration)"
+        },
+        "jiraDailyReport.whoAmI": {
+          "type": "string",
+          "default": "Developer",
+          "description": "We support QA/QC now 🥹, pass: tuyencao"
         },
         "jiraDailyReport.autoClipboard": {
           "type": "boolean",

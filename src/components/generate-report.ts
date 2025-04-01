@@ -1,9 +1,8 @@
 import { getDateInfo } from './date-utils';
-import { getAutoClipboardConfig,  } from './config-utils';
-import { fetchAllTasks, calculateTotalHours, fetchUserDisplayName, fetchPreviousWorkdayTasks } from './task-fetcher';
-import { buildMainReport, buildTodoList, combineReport, buildTotalHoursNote } from './report-builder';
+import { getAutoClipboardConfig } from './config-utils';
+import { fetchAllTasks, fetchUserDisplayName, fetchPreviousWorkdayTasks } from './task-fetcher';
+import { buildMainReport, buildTodoList, combineReport } from './report-builder';
 import { displayReport, copyToClipboard } from './output-utils';
-import { generateWorklogsReport } from './worklogs-weekly';
 import TempoFetcher from './tempo/fetcher';
 import TempoFormatter from './tempo/formatter';
 
