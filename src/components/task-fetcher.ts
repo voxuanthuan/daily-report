@@ -36,7 +36,7 @@ export async function fetchUserDisplayName(): Promise<any> {
 }
 
 async function fetchBacklogTasks(): Promise<{ inProgress: any[]; open: any[] }> {
-    const jql = `assignee = '${JIRA_USERNAME}' AND status IN ('Open', 'In Progress')`;
+    const jql = `assignee = '${JIRA_USERNAME}' AND status IN ('Selected for Development', 'Open', 'In Progress')`;
     const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,subtasks,status,worklog,priority,issuetype${IS_QC ? ',parent' : ''}`;
 
     try {
@@ -50,7 +50,7 @@ async function fetchBacklogTasks(): Promise<{ inProgress: any[]; open: any[] }> 
 
         return {
             inProgress: tasksWithoutMeaningfulSubtasks.filter((task: any) => task.fields.status.name === 'In Progress'),
-            open: tasksWithoutMeaningfulSubtasks.filter((task: any) => task.fields.status.name === 'Open'),
+            open: tasksWithoutMeaningfulSubtasks.filter((task: any) => task.fields.status.name === 'Open' || task.fields.status.name === 'Selected for Development'),
         };
     } catch (error: any) {
         console.error(`Failed to fetch backlog tasks: ${error.message}`, error.response?.data);

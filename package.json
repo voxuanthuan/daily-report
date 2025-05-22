@@ -2,7 +2,7 @@
   "name": "jira-daily-report",
   "displayName": "jira-daily-report",
   "description": "Generates a Daily Report from Jira",
-  "version": "0.1.5",
+  "version": "0.1.8",
   "publisher": "thuanvo",
   "icon": "images/icon.png",
   "repository": {
@@ -51,12 +51,12 @@
           "default": "",
           "description": "Your Jira Tempo API token (Tempo > Setting > Data Access > API Intergration)"
         },
-        "jiraDailyReport.whoAmI": {
+        "grappleDailyReport.whoAmI": {
           "type": "string",
           "default": "Developer",
-          "description": "We support QA/QC now 🥹, pass: tuyencao"
+          "description": "We support QA/QC now 🥹, pass: Developer/QC"
         },
-        "jiraDailyReport.autoClipboard": {
+        "grappleDailyReport.autoClipboard": {
           "type": "boolean",
           "default": true,
           "description": "Automatically copy the generated report to clipboard"
