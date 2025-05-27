@@ -5,7 +5,6 @@ interface Worklog {
   issue: { key: string; summary: string };
   timeSpentSeconds: number;
   startDate: string;
-  worker: string;
   description?: string;
 }
 

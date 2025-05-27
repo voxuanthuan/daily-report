@@ -1,4 +1,6 @@
 # Changelog
+## [1.0.0]
+- 🐛 Bug Fix: The Tempo app change API
 ## [1.0.4]
 - Feature: Apply Tempo Sheet
 - 🐛 Bug Fix: Show correct List "Yesterday" Task

@@ -17,7 +17,10 @@ export interface Worklog {
   issue: WorklogIssue;
   timeSpentSeconds: number;
   startDate: string;
-  worker: string;
+  author: {
+    accountId: string;
+    self: string;  
+  };
   description?: string;
 }
 
@@ -76,10 +79,13 @@ class TempoFetcher {
         params: {
           from: startDate,
           to: endDate,
-          worker: this.workerId,
+          offset: 0,
+          limit: 1000, // Adjust limit as needed
+          accountId: this.workerId, // Assuming workerId is the account ID
         },
       });
-      return response.data.results;
+      const final = response.data.results.filter((item) => item.author?.accountId === this.workerId);
+      return final;
     } catch (error) {
       if (axios.isAxiosError(error)) {
         throw new Error(`Failed to fetch worklogs: ${error.response?.data?.errorMessages || error.message}`);
@@ -100,7 +106,7 @@ class TempoFetcher {
           worker: this.workerId,
         },
       });
-      return response.data.results;
+      return response.data.results.filter((item) => item.author?.accountId === this.workerId);
     } catch (error) {
       console.error('Error fetching worklogs:', error);
       throw error; // Re-throw to be handled by the caller
