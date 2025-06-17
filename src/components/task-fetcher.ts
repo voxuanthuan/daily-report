@@ -98,7 +98,7 @@ async function fetchJiraIssueDetails(issueKey: string): Promise<JiraIssue | null
   // Fetch yesterday's tasks with full issue details, with 5-day lookback
   export async function fetchPreviousWorkdayTasks(workerId: string): Promise<PreviousWorkdayResult> {
     const tempoFetcher = new TempoFetcher(workerId);
-    const maxLookbackDays = 5;
+    const maxLookbackDays = 14;
     
     let currentDay = moment.tz('Australia/Sydney').subtract(1, 'day');
     
