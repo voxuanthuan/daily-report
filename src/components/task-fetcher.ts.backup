@@ -17,11 +17,6 @@ interface JiraIssue {
     };
   }
 
-  export interface PreviousWorkdayResult {
-    tasks: JiraIssue[];
-    actualDate: string | null;
-  }
-
 export async function fetchAllTasks(): Promise<{ inProgress: any[]; open: any[] }> {
     return await fetchBacklogTasks();
 }
@@ -96,7 +91,7 @@ async function fetchJiraIssueDetails(issueKey: string): Promise<JiraIssue | null
   }
   
   // Fetch yesterday's tasks with full issue details, with 5-day lookback
-  export async function fetchPreviousWorkdayTasks(workerId: string): Promise<PreviousWorkdayResult> {
+  export async function fetchPreviousWorkdayTasks(workerId: string): Promise<any[]> {
     const tempoFetcher = new TempoFetcher(workerId);
     const maxLookbackDays = 5;
     
@@ -131,7 +126,7 @@ async function fetchJiraIssueDetails(issueKey: string): Promise<JiraIssue | null
           const issueDetails = (await Promise.all(issueDetailsPromises)).filter((issue): issue is JiraIssue => issue !== null);
           
           console.log(`Found ${issueDetails.length} tasks for ${currentDateStr}`);
-          return { tasks: issueDetails, actualDate: currentDateStr };
+          return issueDetails;
         }
       } catch (error: any) {
         console.error(`Failed to fetch worklogs for ${currentDateStr}: ${error.message}`);
@@ -142,5 +137,5 @@ async function fetchJiraIssueDetails(issueKey: string): Promise<JiraIssue | null
     }
     
     console.log(`No worklogs found in the last ${maxLookbackDays} workdays`);
-    return { tasks: [], actualDate: null };
+    return [];
   }
