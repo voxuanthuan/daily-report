@@ -1,4 +1,8 @@
 # Changelog
+
+
+## [2.0.0]
+- 🐛 Feature: get last logtime for "yesteday" report
 ## [1.0.0]
 - 🐛 Bug Fix: The Tempo app change API
 ## [1.0.4]
