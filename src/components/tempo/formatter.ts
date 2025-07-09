@@ -1,4 +1,5 @@
 import moment from 'moment-timezone';
+import TimesheetParser, { TimesheetEntry, ParsedTimesheetLog } from './timesheet-parser';
 
 interface Worklog {
   tempoWorklogId: number;
@@ -126,6 +127,64 @@ class TempoFormatter {
     content += '\n' + thisWeekRows.join('\n');
     content += '\n';
     return content;
+  }
+
+  /**
+   * Parse timesheet log format and convert to display format
+   * @param timesheetLog - Raw timesheet log string like "B2B-1079 2h, PROJECT-123 1.5h"
+   * @returns Formatted string with breakdown by ticket
+   */
+  formatTimesheetLog(timesheetLog: string): string {
+    const parsed = TimesheetParser.parseTimesheetLog(timesheetLog);
+    
+    if (!parsed.isValid) {
+      return `❌ Invalid timesheet format: ${parsed.errors.join(', ')}\n\nExpected format examples:\n${TimesheetParser.getExampleFormats().map(f => `  • ${f}`).join('\n')}`;
+    }
+
+    let content = '📋 **Timesheet Log Summary**\n\n';
+    
+    // Group entries by ticket
+    const ticketTotals: { [key: string]: number } = {};
+    parsed.entries.forEach(entry => {
+      ticketTotals[entry.ticketKey] = (ticketTotals[entry.ticketKey] || 0) + entry.timeSpentSeconds;
+    });
+
+    // Format breakdown
+    content += '**Breakdown by Ticket:**\n';
+    Object.entries(ticketTotals).forEach(([ticket, seconds]) => {
+      content += `  • ${ticket}: ${TimesheetParser.formatSecondsToTime(seconds)}\n`;
+    });
+
+    content += `\n**Total Time:** ${TimesheetParser.formatSecondsToTime(parsed.totalSeconds)}\n`;
+    content += `**Total Hours:** ${(parsed.totalSeconds / 3600).toFixed(2)}h\n`;
+
+    return content;
+  }
+
+  /**
+   * Convert timesheet log entries to worklog format for integration
+   * @param timesheetLog - Raw timesheet log string
+   * @param startDate - Date for the worklogs (YYYY-MM-DD format)
+   * @returns Array of worklog-like objects
+   */
+  convertTimesheetToWorklogs(timesheetLog: string, startDate: string): Worklog[] {
+    const parsed = TimesheetParser.parseTimesheetLog(timesheetLog);
+    
+    if (!parsed.isValid) {
+      return [];
+    }
+
+    return parsed.entries.map((entry, index) => ({
+      tempoWorklogId: -1 * (index + 1), // Negative IDs to distinguish from real tempo logs
+      issue: {
+        key: entry.ticketKey,
+        summary: `Timesheet entry for ${entry.ticketKey}`,
+        id: entry.ticketKey
+      },
+      timeSpentSeconds: entry.timeSpentSeconds,
+      startDate: startDate,
+      description: `Timesheet log: ${entry.rawText}`
+    }));
   }
 }
 
