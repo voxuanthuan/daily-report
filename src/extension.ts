@@ -2,23 +2,32 @@ import * as vscode from 'vscode';
 import { generateDailyReport } from './components/generate-report';
 import {openJiraTicket} from './components/open-ticket';
 import TimesheetHandler from './components/timesheet-handler';
+import JiraQuickAction from './components/jira-quick-action';
 import { fetchUserDisplayName } from './components/task-fetcher';
 
 export function activate(context: vscode.ExtensionContext) {
     let timesheetHandler: TimesheetHandler | null = null;
+    let quickActionHandler: JiraQuickAction | null = null;
     
-    // Initialize timesheet handler with user account when needed
-    const initializeTimesheetHandler = async (): Promise<TimesheetHandler> => {
-        if (!timesheetHandler) {
+    // Initialize handlers with user account when needed
+    const initializeHandlers = async (): Promise<{ timesheet: TimesheetHandler; quickAction: JiraQuickAction }> => {
+        if (!timesheetHandler || !quickActionHandler) {
             try {
                 const user = await fetchUserDisplayName();
                 timesheetHandler = new TimesheetHandler(user.accountId);
+                quickActionHandler = new JiraQuickAction(user.accountId);
             } catch (error) {
-                vscode.window.showErrorMessage('Failed to initialize timesheet handler. Please check your Jira configuration.');
+                vscode.window.showErrorMessage('Failed to initialize handlers. Please check your Jira configuration.');
                 timesheetHandler = new TimesheetHandler(); // Fallback without account ID
+                quickActionHandler = new JiraQuickAction(); // Fallback without account ID
             }
         }
-        return timesheetHandler;
+        return { timesheet: timesheetHandler, quickAction: quickActionHandler };
+    };
+    
+    const initializeTimesheetHandler = async (): Promise<TimesheetHandler> => {
+        const handlers = await initializeHandlers();
+        return handlers.timesheet;
     };
     
     const openTicketCommand = vscode.commands.registerCommand('jiraDailyReport.open', async () => {
@@ -47,12 +56,30 @@ export function activate(context: vscode.ExtensionContext) {
         await handler.logSingleWorklog();
     });
 
+    const quickActionCommand = vscode.commands.registerCommand('jiraDailyReport.quickAction', async () => {
+        const handlers = await initializeHandlers();
+        await handlers.quickAction.executeCommand();
+    });
+
+    const myTicketsCommand = vscode.commands.registerCommand('jiraDailyReport.myTickets', async () => {
+        const handlers = await initializeHandlers();
+        await handlers.quickAction.showMyTickets();
+    });
+
+    const quickActionHelpCommand = vscode.commands.registerCommand('jiraDailyReport.quickActionHelp', async () => {
+        const handlers = await initializeHandlers();
+        await handlers.quickAction.showHelp();
+    });
+
     context.subscriptions.push(
         vscode.commands.registerCommand('jiraDailyReport.generate', generateDailyReport),
         openTicketCommand,
         parseTimesheetCommand,
         logTimeToTempoCommand,
-        logSingleWorklogCommand
+        logSingleWorklogCommand,
+        quickActionCommand,
+        myTicketsCommand,
+        quickActionHelpCommand
     );
     
     // Cleanup on deactivation
@@ -60,6 +87,9 @@ export function activate(context: vscode.ExtensionContext) {
         dispose: () => {
             if (timesheetHandler) {
                 timesheetHandler.dispose();
+            }
+            if (quickActionHandler) {
+                quickActionHandler.dispose();
             }
         }
     });

@@ -2,7 +2,7 @@
   "name": "jira-daily-report",
   "displayName": "jira-daily-report",
   "description": "Generates a Daily Report from Jira",
-  "version": "2.0.0",
+  "version": "0.1.92",
   "publisher": "thuanvo",
   "icon": "images/icon.png",
   "repository": {
@@ -28,16 +28,42 @@
         "title": "Open Ticket"
       },
       {
-        "command": "jiraDailyReport.parseTimesheet",
-        "title": "Parse Timesheet Log"
+        "command": "jiraDailyReport.quickAction",
+        "title": "Jira Quick Action"
       },
       {
-        "command": "jiraDailyReport.logTimeToTempo",
-        "title": "Log Time to Tempo"
+        "command": "jiraDailyReport.myTickets",
+        "title": "My Jira Tickets"
       },
       {
-        "command": "jiraDailyReport.logSingleWorklog",
-        "title": "Log Single Worklog to Tempo"
+        "command": "jiraDailyReport.quickActionHelp",
+        "title": "Jira Quick Action Help"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "jiraDailyReport.quickAction",
+        "key": "ctrl+shift+j",
+        "mac": "cmd+shift+j",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "jiraDailyReport.myTickets",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "jiraDailyReport.generate",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "jiraDailyReport.open",
+        "key": "ctrl+shift+o",
+        "mac": "cmd+shift+o",
+        "when": "editorTextFocus"
       }
     ],
     "configuration": {
