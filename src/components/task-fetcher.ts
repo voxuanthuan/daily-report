@@ -42,7 +42,8 @@ export async function fetchUserDisplayName(): Promise<any> {
 
 async function fetchBacklogTasks(): Promise<{ inProgress: any[]; open: any[] }> {
     const jql = `assignee = '${JIRA_USERNAME}' AND status IN ('Selected for Development', 'Open', 'In Progress')`;
-    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,subtasks,status,worklog,priority,issuetype${IS_QC ? ',parent' : ''}`;
+    const fields = ['summary', 'subtasks', 'status', 'priority', 'issuetype'].concat(IS_QC ? ['parent'] : []).join(',');
+    const url = `${JIRA_SERVER}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&maxResults=100`;
 
     try {
         const response = await axios.get(url, { headers: apiHeaders });
@@ -64,13 +65,9 @@ async function fetchBacklogTasks(): Promise<{ inProgress: any[]; open: any[] }> 
 }
 
 function calculateWorklogHours(task: any, date: string): number {
-    const worklogs = task.fields.worklog?.worklogs || [];
-    const totalSeconds = worklogs
-        .filter((log: any) => {
-            return moment(log.created).format('YYYY-MM-DD') === date && log.author?.emailAddress === JIRA_USERNAME;
-        })
-        .reduce((sum: number, log: any) => sum + (log.timeSpentSeconds || 0), 0);
-    return Math.round(totalSeconds / 3600);
+    // Note: Worklog data is no longer available through search API due to deprecation
+    // Use Tempo API for time tracking instead
+    return 0;
 }
 
 

@@ -1,5 +1,7 @@
 # Changelog
 
+## [0.1.94]
+- 🐛 Fix: Jira API deprecated
 
 ## [2.0.0]
 - 🐛 Feature: get last logtime for "yesteday" report
