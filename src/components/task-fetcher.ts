@@ -30,12 +30,42 @@ export function calculateTotalHours(tasks: any[], previousDay: string): number {
     return tasks.reduce((sum, task) => sum + calculateWorklogHours(task, previousDay), 0);
 }
 
+// Simple cache for user info (5 minute TTL)
+interface UserCache {
+    data: any;
+    timestamp: number;
+}
+
+let userCache: UserCache | null = null;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 export async function fetchUserDisplayName(): Promise<any> {
+    // Check cache first
+    if (userCache && (Date.now() - userCache.timestamp) < CACHE_TTL_MS) {
+        console.log('Using cached user info');
+        return userCache.data;
+    }
+
     try {
+        console.log('Fetching fresh user info from API');
         const response = await axios.get(`${JIRA_SERVER}/rest/api/3/myself`, { headers: apiHeaders });
+        
+        // Update cache
+        userCache = {
+            data: response.data,
+            timestamp: Date.now()
+        };
+        
         return response.data;
     } catch (error) {
         console.error('Failed to fetch user info:', error);
+        
+        // Fallback: return cached data if available, otherwise default
+        if (userCache) {
+            console.log('Using stale cached user info due to API error');
+            return userCache.data;
+        }
+        
         return JIRA_USERNAME.split('@')[0];
     }
 }
@@ -91,53 +121,117 @@ async function fetchJiraIssueDetails(issueKey: string): Promise<JiraIssue | null
       return null;
     }
   }
-  
-  // Fetch yesterday's tasks with full issue details, with 5-day lookback
-  export async function fetchPreviousWorkdayTasks(workerId: string): Promise<PreviousWorkdayResult> {
-    const tempoFetcher = new TempoFetcher(workerId);
-    const maxLookbackDays = 14;
-    
-    let currentDay = moment.tz('Australia/Sydney').subtract(1, 'day');
-    
-    // Skip weekends for the initial day
-    while (currentDay.isoWeekday() > 5) {
-      currentDay.subtract(1, 'day');
+
+  // Extract previous workday tasks from existing worklog data (no additional API calls)
+  export async function extractPreviousWorkdayTasks(allWorklogs: any[], workerId: string): Promise<PreviousWorkdayResult> {
+    if (allWorklogs.length === 0) {
+      console.log('No worklogs provided for extraction');
+      return { tasks: [], actualDate: null };
     }
-  
-    for (let i = 0; i < maxLookbackDays; i++) {
+
+    // Group worklogs by date
+    const worklogsByDate: { [key: string]: typeof allWorklogs } = {};
+    allWorklogs.forEach(worklog => {
+      const logDate = moment.tz(worklog.startDate, 'Australia/Sydney').format('YYYY-MM-DD');
+      if (!worklogsByDate[logDate]) {
+        worklogsByDate[logDate] = [];
+      }
+      worklogsByDate[logDate].push(worklog);
+    });
+
+    // Find the most recent workday (excluding weekends) with worklogs
+    const yesterday = moment.tz('Australia/Sydney').subtract(1, 'day');
+    let currentDay = yesterday.clone();
+    
+    for (let i = 0; i < 14; i++) {
       // Skip weekends
       while (currentDay.isoWeekday() > 5) {
         currentDay.subtract(1, 'day');
       }
       
       const currentDateStr = currentDay.format('YYYY-MM-DD');
+      const dayWorklogs = worklogsByDate[currentDateStr];
       
-      try {
-        const worklogs = await tempoFetcher.fetchWorklogs(currentDateStr, currentDateStr);
-        console.log(`Fetched ${worklogs.length} worklogs for ${currentDateStr} (attempt ${i + 1}/${maxLookbackDays})`);
-    
-        const filteredWorklogs = worklogs.filter(worklog =>
-          moment.tz(worklog.startDate, 'Australia/Sydney').format('YYYY-MM-DD') === currentDateStr
+      if (dayWorklogs && dayWorklogs.length > 0) {
+        // Fetch Jira issue details for each worklog in parallel
+        const issueDetailsPromises = dayWorklogs.map(worklog =>
+          fetchJiraIssueDetails(worklog.issue.id)
         );
+        const issueDetails = (await Promise.all(issueDetailsPromises)).filter((issue): issue is JiraIssue => issue !== null);
+        
+        console.log(`Extracted ${issueDetails.length} tasks from existing data for: ${currentDateStr}`);
+        return { tasks: issueDetails, actualDate: currentDateStr };
+      }
+      
+      currentDay.subtract(1, 'day');
+    }
+
+    console.log('No worklogs found on working days in existing data');
+    return { tasks: [], actualDate: null };
+  }
+  
+  // Fetch yesterday's tasks with full issue details, with optimized single API call
+  export async function fetchPreviousWorkdayTasks(workerId: string): Promise<PreviousWorkdayResult> {
+    const tempoFetcher = new TempoFetcher(workerId);
     
-        if (filteredWorklogs.length > 0) {
-          // Fetch Jira issue details for each worklog
-          const issueDetailsPromises = filteredWorklogs.map(worklog =>
+    // Calculate date range: 14 working days back from today
+    const endDate = moment.tz('Australia/Sydney').subtract(1, 'day');
+    const startDate = endDate.clone().subtract(14, 'days');
+    
+    try {
+      // Single API call to fetch all worklogs in the range
+      const allWorklogs = await tempoFetcher.fetchWorklogs(
+        startDate.format('YYYY-MM-DD'), 
+        endDate.format('YYYY-MM-DD')
+      );
+      
+      console.log(`Fetched ${allWorklogs.length} worklogs in date range ${startDate.format('YYYY-MM-DD')} to ${endDate.format('YYYY-MM-DD')}`);
+      
+      if (allWorklogs.length === 0) {
+        console.log('No worklogs found in the last 14 days');
+        return { tasks: [], actualDate: null };
+      }
+      
+      // Group worklogs by date and find most recent workday with logs
+      const worklogsByDate: { [key: string]: typeof allWorklogs } = {};
+      allWorklogs.forEach(worklog => {
+        const logDate = moment.tz(worklog.startDate, 'Australia/Sydney').format('YYYY-MM-DD');
+        if (!worklogsByDate[logDate]) {
+          worklogsByDate[logDate] = [];
+        }
+        worklogsByDate[logDate].push(worklog);
+      });
+      
+      // Find the most recent workday (excluding weekends) with worklogs
+      let currentDay = endDate.clone();
+      for (let i = 0; i < 14; i++) {
+        // Skip weekends
+        while (currentDay.isoWeekday() > 5) {
+          currentDay.subtract(1, 'day');
+        }
+        
+        const currentDateStr = currentDay.format('YYYY-MM-DD');
+        const dayWorklogs = worklogsByDate[currentDateStr];
+        
+        if (dayWorklogs && dayWorklogs.length > 0) {
+          // Fetch Jira issue details for each worklog in parallel
+          const issueDetailsPromises = dayWorklogs.map(worklog =>
             fetchJiraIssueDetails(worklog.issue.id)
           );
           const issueDetails = (await Promise.all(issueDetailsPromises)).filter((issue): issue is JiraIssue => issue !== null);
           
-          console.log(`Found ${issueDetails.length} tasks for ${currentDateStr}`);
+          console.log(`Found ${issueDetails.length} tasks for most recent workday: ${currentDateStr}`);
           return { tasks: issueDetails, actualDate: currentDateStr };
         }
-      } catch (error: any) {
-        console.error(`Failed to fetch worklogs for ${currentDateStr}: ${error.message}`);
+        
+        currentDay.subtract(1, 'day');
       }
       
-      // Move to previous workday
-      currentDay.subtract(1, 'day');
+      console.log('No worklogs found on working days in the last 14 days');
+      return { tasks: [], actualDate: null };
+      
+    } catch (error: any) {
+      console.error(`Failed to fetch worklogs for date range: ${error.message}`);
+      return { tasks: [], actualDate: null };
     }
-    
-    console.log(`No worklogs found in the last ${maxLookbackDays} workdays`);
-    return { tasks: [], actualDate: null };
   }

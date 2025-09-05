@@ -75,16 +75,16 @@ class TempoFetcher {
     }
 
     try {
-      const response: AxiosResponse<TempoResponse> = await this.axiosInstance.get('/worklogs', {
-        params: {
-          from: startDate,
-          to: endDate,
-          offset: 0,
-          limit: 1000, // Adjust limit as needed
-          accountId: this.workerId, // Assuming workerId is the account ID
-        },
-      });
-      const final = response.data.results.filter((item) => item.author?.accountId === this.workerId);
+      const requestBody = {
+        authorIds: [this.workerId],
+        from: startDate,
+        to: endDate,
+        offset: 0,
+        limit: 70
+      };
+
+      const response: AxiosResponse<TempoResponse> = await this.axiosInstance.post('/worklogs/search', requestBody);
+      const final = response.data.results;
       return final;
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -99,14 +99,14 @@ class TempoFetcher {
       const sydneyStartDate = moment.tz(startDate, this.timezone).format('YYYY-MM-DD');
       const sydneyEndDate = moment.tz(endDate, this.timezone).format('YYYY-MM-DD');
 
-      const response: AxiosResponse<TempoResponse> = await this.axiosInstance.get('/worklogs', {
-        params: {
-          from: sydneyStartDate,
-          to: sydneyEndDate,
-          worker: this.workerId,
-        },
-      });
-      return response.data.results.filter((item) => item.author?.accountId === this.workerId);
+      const requestBody = {
+        authorIds: [this.workerId],
+        from: sydneyStartDate,
+        to: sydneyEndDate
+      };
+
+      const response: AxiosResponse<TempoResponse> = await this.axiosInstance.post('/worklogs/search', requestBody);
+      return response.data.results;
     } catch (error) {
       console.error('Error fetching worklogs:', error);
       throw error; // Re-throw to be handled by the caller
