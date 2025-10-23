@@ -102,7 +102,7 @@ export class CLIOutputProvider implements IOutputProvider {
       }
 
       // Build the full message with shortcuts
-      const shortcuts = '\x1b[90m(esc to interrupt · ctrl+t to show todos · \x1b[0m';
+      const shortcuts = '\x1b[90m(esc to interrupt · \x1b[0m';
       const timeAndTokens = `\x1b[90m${elapsed}s${progressInfo})\x1b[0m`;
 
       // Display Claude logo animation with progress (like Claude Code style)
