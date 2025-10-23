@@ -56,9 +56,7 @@ program
         useCache: options.cache !== false,
       });
 
-      if (!options.silent) {
-        console.log('\x1b[32m✓\x1b[0m Report generated successfully');
-      }
+      // Success message removed to reduce clutter - spinner already shows completion
     } catch (error) {
       console.error('\x1b[31m✖\x1b[0m Error:', error instanceof Error ? error.message : String(error));
       process.exit(1);

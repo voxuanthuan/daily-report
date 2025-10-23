@@ -36,7 +36,6 @@ export class CLIConfigProvider implements IConfigProvider {
           const content = fs.readFileSync(configPath, 'utf-8');
           const fileConfig = JSON.parse(content);
           this.config = { ...this.config, ...fileConfig };
-          console.log(`Loaded config from: ${configPath}`);
         }
       } catch (error) {
         console.warn(`Failed to load config from ${configPath}:`, error instanceof Error ? error.message : String(error));

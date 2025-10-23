@@ -7,8 +7,51 @@ import * as fs from 'fs';
  */
 export class CLIOutputProvider implements IOutputProvider {
   private spinnerInterval: NodeJS.Timeout | null = null;
-  private spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   private currentFrame = 0;
+  private startTime: number = 0;
+
+  // Progress tracking (simulating token count like Claude Code)
+  private tokenCount = 0;
+  private targetTokenCount = 0;
+  private displayTokenCount = 0;
+
+  // Claude Code starburst/asterisk icon frames (animated rotation)
+  private starburstFrames = [
+    '✶',  // 8-pointed star
+    '✷',  // heavy asterisk
+    '✸',  // heavy 8-teardrop asterisk
+    '✹',  // balloon asterisk
+    '✺',  // heavy balloon asterisk
+    '✻',  // 6-pointed asterisk
+    '✼',  // teardrop asterisk
+    '✽',  // open center asterisk
+  ];
+
+  // Alternative: More dynamic starburst frames
+  private burstFrames = [
+    '◦∘∙⊙∘◦',
+    '∘∙⊙●⊙∙∘',
+    '∙⊙●◉●⊙∙',
+    '⊙●◉◉◉●⊙',
+    '∙⊙●◉●⊙∙',
+    '∘∙⊙●⊙∙∘',
+  ];
+
+  // Simple rotating asterisk frames
+  private asteriskFrames = [
+    '✦',  // 4-pointed star
+    '✧',  // white 4-pointed star
+    '✶',  // 6-pointed black star
+    '✷',  // heavy asterisk
+  ];
+
+  // Gradient colors for the logo (light orange palette)
+  private logoColors = [
+    '\x1b[38;5;214m', // golden orange
+    '\x1b[38;5;215m', // light golden orange
+    '\x1b[38;5;216m', // peach orange
+    '\x1b[38;5;223m', // light peach
+  ];
 
   constructor(
     private options: {
@@ -27,13 +70,49 @@ export class CLIOutputProvider implements IOutputProvider {
     }
 
     this.currentFrame = 0;
-    process.stdout.write('\n');
+    this.startTime = Date.now();
+    // Don't add extra newline before spinner
 
     this.spinnerInterval = setInterval(() => {
-      const frame = this.spinnerFrames[this.currentFrame];
-      process.stdout.write(`\r\x1b[36m${frame}\x1b[0m ${message}...`);
-      this.currentFrame = (this.currentFrame + 1) % this.spinnerFrames.length;
-    }, 80);
+      const frameIdx = this.currentFrame % this.starburstFrames.length;
+      const colorIdx = this.currentFrame % this.logoColors.length;
+      const logo = this.starburstFrames[frameIdx];
+      const iconColor = this.logoColors[colorIdx];
+
+      // Text color changes slower - every 2 frames (or adjust divisor for slower/faster)
+      const textColorIdx = Math.floor(this.currentFrame / 2) % this.logoColors.length;
+      const textColor = this.logoColors[textColorIdx];
+
+      // Calculate elapsed time (no decimal)
+      const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+
+      // Incrementally increase display token count towards target (like Claude Code)
+      if (this.displayTokenCount < this.targetTokenCount) {
+        // Increment by steps to make it smooth but fast
+        const increment = Math.max(1, Math.ceil((this.targetTokenCount - this.displayTokenCount) / 20));
+        this.displayTokenCount = Math.min(this.displayTokenCount + increment, this.targetTokenCount);
+      }
+
+      // Build progress info string (token count like Claude Code)
+      let progressInfo = '';
+      if (this.displayTokenCount > 0) {
+        // Format token count with thousands separator and ↓ symbol
+        const formattedTokens = this.displayTokenCount.toLocaleString();
+        progressInfo = ` · ↓ ${formattedTokens} tokens`;
+      }
+
+      // Build the full message with shortcuts
+      const shortcuts = '\x1b[90m(esc to interrupt · ctrl+t to show todos · \x1b[0m';
+      const timeAndTokens = `\x1b[90m${elapsed}s${progressInfo})\x1b[0m`;
+
+      // Display Claude logo animation with progress (like Claude Code style)
+      // Icon color changes every frame, text color changes slower
+      process.stdout.write(
+        `\r\x1b[K  ${iconColor}${logo}\x1b[0m  ${textColor}${message}...\x1b[0m ${shortcuts}${timeAndTokens}`
+      );
+
+      this.currentFrame++;
+    }, 150);
   }
 
   /**
@@ -44,12 +123,31 @@ export class CLIOutputProvider implements IOutputProvider {
       clearInterval(this.spinnerInterval);
       this.spinnerInterval = null;
 
+      // Clear the loading line completely (like Claude Code does)
+      process.stdout.write('\r\x1b[K');
+
+      // Optionally show a subtle completion message
       if (finalMessage) {
-        process.stdout.write(`\r\x1b[32m✓\x1b[0m ${finalMessage}\n`);
-      } else {
-        process.stdout.write('\r\x1b[K'); // Clear the line
+        process.stdout.write(`\x1b[32m✓\x1b[0m \x1b[90m${finalMessage}\x1b[0m\n`);
       }
     }
+  }
+
+  /**
+   * Update progress information during generation
+   */
+  updateProgress(tasks?: number, worklogs?: number): void {
+    // Convert tasks and worklogs to simulated token count
+    // Smaller estimate: each task ~30 tokens, each worklog ~10 tokens
+    let estimatedTokens = 0;
+    if (tasks !== undefined) {
+      estimatedTokens += tasks * 30;
+    }
+    if (worklogs !== undefined) {
+      estimatedTokens += worklogs * 10;
+    }
+    // Set the target, displayTokenCount will incrementally catch up
+    this.targetTokenCount = estimatedTokens;
   }
 
   /**
@@ -102,8 +200,8 @@ export class CLIOutputProvider implements IOutputProvider {
         console.log('\n' + formattedContent + '\n');
       }
     } else {
-      // Output to console
-      console.log('\n' + formattedContent + '\n');
+      // Output to console (no extra spacing)
+      console.log(formattedContent);
     }
   }
 
