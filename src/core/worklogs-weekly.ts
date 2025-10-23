@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
-import { apiHeaders, authHeader, JIRA_SERVER, JIRA_USERNAME } from './config-utils';
+import { getApiHeaders, getAuthHeader, getJiraServer, getJiraUsername } from '../components/config-utils';
 
 interface TempoWorklog {
     timeSpentSeconds: number;
@@ -23,13 +23,13 @@ export async function generateWorklogsReport() {
         const params = {
             from: startOfWeek.toISOString().split('T')[0],
             to: endOfWeek.toISOString().split('T')[0],
-            username: JIRA_USERNAME
+            username: getJiraUsername()
         };
         const response = await axios.get(
-            `${JIRA_SERVER}/rest/tempo-timesheets/4/worklogs`,
+            `${getJiraServer()}/rest/tempo-timesheets/4/worklogs`,
             {
                 headers: {
-                  'Authorization': authHeader,
+                  'Authorization': getAuthHeader(),
                   'Accept': 'application/json'
                 },
                 params

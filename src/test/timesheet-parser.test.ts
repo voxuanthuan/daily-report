@@ -1,6 +1,6 @@
 import * as assert from 'assert';
-import TimesheetParser from '../components/tempo/timesheet-parser';
-import TempoFormatter from '../components/tempo/formatter';
+import TimesheetParser from '../core/tempo/timesheet-parser';
+import TempoFormatter from '../core/tempo/formatter';
 
 suite('Timesheet Parser Tests', () => {
   test('should parse single ticket with hours', () => {

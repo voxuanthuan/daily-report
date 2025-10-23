@@ -1,0 +1,17 @@
+# Edit .jira-report.json with these steps:
+
+1. Open the file:
+   code .jira-report.json
+   # or
+   nano .jira-report.json
+
+2. Replace the values with your actual credentials:
+   - jiraServer: Your Jira URL (e.g., https://grapplefinance.atlassian.net/)
+   - username: Your Jira email
+   - apiToken: Your Jira API token
+   - jiraTempoToken: Your Tempo API token
+
+3. Save the file
+
+4. Test with:
+   jira-report generate

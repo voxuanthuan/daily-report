@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
-import { TEMPO_API_TOKEN, TEMPO_URL, JIRA_SERVER, apiHeaders } from '../config-utils';
+import { getTempoApiToken, TEMPO_URL, getJiraServer, getApiHeaders } from '../../components/config-utils';
 import moment from 'moment-timezone';
 import TimesheetParser, { TimesheetEntry } from './timesheet-parser';
 
@@ -71,15 +71,15 @@ export class TempoWorklogCreator {
     this.tempoAxios = axios.create({
       baseURL: TEMPO_URL,
       headers: {
-        Authorization: `Bearer ${TEMPO_API_TOKEN}`,
+        Authorization: `Bearer ${getTempoApiToken()}`,
         'Content-Type': 'application/json',
       },
     });
     
     // Jira API instance
     this.jiraAxios = axios.create({
-      baseURL: JIRA_SERVER,
-      headers: apiHeaders,
+      baseURL: getJiraServer(),
+      headers: getApiHeaders(),
     });
   }
 
@@ -118,7 +118,7 @@ export class TempoWorklogCreator {
     description?: string,
     startTime?: string
   ): Promise<WorklogCreationResult> {
-    if (!TEMPO_API_TOKEN) {
+    if (!getTempoApiToken()) {
       const error = `Tempo API token is missing. Please configure it in settings. See ${TEMPO_API_DOCS_LINK}`;
       vscode.window.showErrorMessage(error);
       return { success: false, error, ticketKey: issueKey, timeSpent: TimesheetParser.formatSecondsToTime(timeSpentSeconds) };

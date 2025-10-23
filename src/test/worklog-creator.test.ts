@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import TempoWorklogCreator from '../components/tempo/worklog-creator';
+import TempoWorklogCreator from '../core/tempo/worklog-creator';
 
 suite('Tempo Worklog Creator Tests', () => {
   const mockAccountId = 'test-account-id';

@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import JiraCommandParser from '../components/jira-command-parser';
+import JiraCommandParser from '../core/jira-command-parser';
 
 suite('Jira Command Parser Tests', () => {
   test('should parse time and status command', () => {

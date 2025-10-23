@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import TimesheetParser from './tempo/timesheet-parser';
-import TempoFormatter from './tempo/formatter';
-import TempoWorklogCreator from './tempo/worklog-creator';
+import TimesheetParser from '../core/tempo/timesheet-parser';
+import TempoFormatter from '../core/tempo/formatter';
+import TempoWorklogCreator from '../core/tempo/worklog-creator';
 import moment from 'moment-timezone';
 
 export class TimesheetHandler {

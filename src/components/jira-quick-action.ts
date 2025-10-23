@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import JiraCommandParser, { JiraCommand } from './jira-command-parser';
-import JiraStatusManager from './jira-status-manager';
-import TempoWorklogCreator from './tempo/worklog-creator';
+import JiraCommandParser, { JiraCommand } from '../core/jira-command-parser';
+import JiraStatusManager from '../core/jira-status-manager';
+import TempoWorklogCreator from '../core/tempo/worklog-creator';
 import moment from 'moment-timezone';
 
 export interface QuickActionResult {

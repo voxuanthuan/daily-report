@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
-import { JIRA_SERVER, apiHeaders } from './config-utils';
+import { getJiraServer, getApiHeaders } from '../components/config-utils';
 
 // Jira API interfaces
 interface JiraTransition {
@@ -48,8 +48,8 @@ export class JiraStatusManager {
 
   constructor() {
     this.jiraAxios = axios.create({
-      baseURL: JIRA_SERVER,
-      headers: apiHeaders,
+      baseURL: getJiraServer(),
+      headers: getApiHeaders(),
     });
   }
 

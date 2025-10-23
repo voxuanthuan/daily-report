@@ -1,22 +1,44 @@
 {
   "name": "jira-daily-report",
   "displayName": "jira-daily-report",
-  "description": "Generates a Daily Report from Jira",
+  "description": "Generate Jira daily standup reports - VS Code extension and CLI tool",
   "version": "0.1.95",
   "publisher": "thuanvo",
+  "author": {
+    "name": "Thuan Vo",
+    "email": "voxuanthuan@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": [
+    "jira",
+    "daily-report",
+    "standup",
+    "tempo",
+    "productivity",
+    "cli",
+    "vscode-extension"
+  ],
+  "homepage": "https://github.com/voxuanthuan/daily-report#readme",
+  "bugs": {
+    "url": "https://github.com/voxuanthuan/daily-report/issues"
+  },
   "icon": "images/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/voxuanthuan/daily-report.git"
   },
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.80.0",
+    "node": ">=16.0.0"
   },
   "categories": [
     "Other"
   ],
   "activationEvents": [],
   "main": "./dist/extension.js",
+  "bin": {
+    "jira-report": "./dist/cli/index.js"
+  },
   "contributes": {
     "commands": [
       {
@@ -38,6 +60,10 @@
       {
         "command": "jiraDailyReport.quickActionHelp",
         "title": "Jira Quick Action Help"
+      },
+      {
+        "command": "jiraDailyReport.clearCache",
+        "title": "Clear Jira Daily Report Cache"
       }
     ],
     "keybindings": [
@@ -112,8 +138,16 @@
       }
     }
   },
+  "files": [
+    "dist/",
+    "images/",
+    "CLI.md",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "vscode:prepublish": "npm run package",
+    "prepublishOnly": "npm run package",
     "compile": "npm run check-types && npm run lint && node esbuild.js",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
@@ -142,7 +176,11 @@
   },
   "dependencies": {
     "axios": "^1.8.1",
+    "commander": "^12.1.0",
     "moment": "^2.30.1",
     "moment-timezone": "^0.5.48"
+  },
+  "optionalDependencies": {
+    "clipboardy": "^4.0.0"
   }
 }
