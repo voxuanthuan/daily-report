@@ -37,6 +37,18 @@ export interface IOutputProvider {
    * Check if clipboard functionality is available
    */
   hasClipboard(): boolean;
+
+  /**
+   * Start a loading spinner/progress indicator (optional - may not be available in all environments)
+   * @param message Message to display with the spinner
+   */
+  startSpinner?(message?: string): void;
+
+  /**
+   * Stop the loading spinner/progress indicator (optional - may not be available in all environments)
+   * @param finalMessage Final message to display after stopping
+   */
+  stopSpinner?(finalMessage?: string): void;
 }
 
 /**
@@ -97,5 +109,23 @@ export class OutputManager {
    */
   hasClipboard(): boolean {
     return this.provider.hasClipboard();
+  }
+
+  /**
+   * Start a loading spinner/progress indicator
+   */
+  startSpinner(message?: string): void {
+    if (this.provider.startSpinner) {
+      this.provider.startSpinner(message);
+    }
+  }
+
+  /**
+   * Stop the loading spinner/progress indicator
+   */
+  stopSpinner(finalMessage?: string): void {
+    if (this.provider.stopSpinner) {
+      this.provider.stopSpinner(finalMessage);
+    }
   }
 }

@@ -61,6 +61,21 @@ export class VSCodeOutputProvider implements IOutputProvider {
   }
 
   /**
+   * Start a loading spinner (no-op for VS Code - uses progress API instead)
+   */
+  startSpinner(_message?: string): void {
+    // VS Code doesn't use console spinners
+    // Progress is shown via vscode.window.withProgress in the extension
+  }
+
+  /**
+   * Stop the loading spinner (no-op for VS Code)
+   */
+  stopSpinner(_finalMessage?: string): void {
+    // VS Code doesn't use console spinners
+  }
+
+  /**
    * Clear the output channel
    */
   clear(): void {

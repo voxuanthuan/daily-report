@@ -70,7 +70,6 @@ export async function fetchUserDisplayName(configManager: ConfigManager): Promis
     }
 
     try {
-        console.log('Fetching fresh user info from API');
         const jiraServer = await configManager.getJiraServer();
         const authHeader = await configManager.getAuthHeader();
         const apiHeaders = {
@@ -101,7 +100,6 @@ export async function fetchUserDisplayName(configManager: ConfigManager): Promis
 }
 
 async function fetchBacklogTasks(configManager: ConfigManager): Promise<{ inProgress: any[]; open: any[] }> {
-    console.log('Fetching fresh task data from API');
     const jiraUsername = await configManager.getUsername();
     const jiraServer = await configManager.getJiraServer();
     const authHeader = await configManager.getAuthHeader();

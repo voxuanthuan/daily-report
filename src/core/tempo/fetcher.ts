@@ -100,7 +100,6 @@ class TempoFetcher {
     }
 
     try {
-      console.log('Fetching fresh worklog data for last six days');
       const requestBody = {
         authorIds: [this.workerId],
         from: startDate,

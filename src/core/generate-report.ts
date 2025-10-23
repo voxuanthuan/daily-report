@@ -22,8 +22,7 @@ export async function generateDailyReport(
         useCache?: boolean;
     } = {}
 ) {
-    console.log('Starting daily report generation');
-    const startTime = Date.now();
+    outputManager.startSpinner('Generating daily report');
 
     try {
         // Get configuration
@@ -31,7 +30,6 @@ export async function generateDailyReport(
             ? options.copyToClipboard
             : await configManager.getAutoClipboard();
 
-        console.log('Fetching tasks and user data in parallel');
         // Parallel execution: Fetch independent data simultaneously
         const [tasks, user] = await Promise.all([
             fetchAllTasks(configManager),
@@ -39,26 +37,20 @@ export async function generateDailyReport(
         ]);
 
         const { open, inProgress } = tasks;
-        console.log(`Found ${inProgress.length} in-progress tasks and ${open.length} open tasks`);
 
         const tempoApiToken = await configManager.getTempoApiToken();
         const fetcher = new TempoFetcher(user.accountId, tempoApiToken);
         const formatter = new TempoFormatter();
 
-        console.log('Fetching worklog data');
         // Optimize: Fetch all worklogs in one call, then extract what we need
         const allWorklogs = await fetcher.fetchLastSixDaysWorklogs();
-        console.log(`Retrieved ${allWorklogs.length} worklogs`);
 
-        console.log('Processing previous workday data');
         // Extract previous workday data from the existing worklog data
         const previousWorkdayResult = await extractPreviousWorkdayTasks(allWorklogs, user.accountId, configManager);
 
         // Use the smart date label based on the actual date found
         const smartDateLabel = getSmartDateLabel(previousWorkdayResult.actualDate);
-        console.log(`Using smart date label: ${smartDateLabel}`);
 
-        console.log('Building report sections');
         // Build main report sections in parallel where possible
         const [mainReport, todoList, workLogContent] = await Promise.all([
             Promise.resolve(buildMainReport(smartDateLabel, inProgress, previousWorkdayResult.tasks)),
@@ -69,18 +61,17 @@ export async function generateDailyReport(
         // Combine all report sections for display
         const finalReport = combineReport(mainReport, '', todoList, workLogContent);
 
-        console.log('Displaying and copying report');
+        // Stop spinner before displaying report
+        outputManager.stopSpinner('Report generated successfully');
+
         // Display the report and optionally copy to clipboard
         await outputManager.displayReport(finalReport, autoClipboard);
-
-        const totalTime = Date.now() - startTime;
-        console.log(`Daily report generation completed in ${totalTime}ms`);
 
         return finalReport;
 
     } catch (error) {
-        const totalTime = Date.now() - startTime;
-        console.error(`Daily report generation failed after ${totalTime}ms:`, error);
+        // Stop spinner on error
+        outputManager.stopSpinner();
 
         // Use output manager to show error
         outputManager.showError(

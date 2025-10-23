@@ -6,6 +6,10 @@ import * as fs from 'fs';
  * Outputs to console, files, or clipboard
  */
 export class CLIOutputProvider implements IOutputProvider {
+  private spinnerInterval: NodeJS.Timeout | null = null;
+  private spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  private currentFrame = 0;
+
   constructor(
     private options: {
       format?: 'text' | 'json' | 'markdown';
@@ -13,6 +17,40 @@ export class CLIOutputProvider implements IOutputProvider {
       outputFile?: string;
     } = {}
   ) {}
+
+  /**
+   * Start a loading spinner with a message
+   */
+  startSpinner(message: string = 'Generating report'): void {
+    if (this.options.silent || process.stdout.isTTY === false) {
+      return;
+    }
+
+    this.currentFrame = 0;
+    process.stdout.write('\n');
+
+    this.spinnerInterval = setInterval(() => {
+      const frame = this.spinnerFrames[this.currentFrame];
+      process.stdout.write(`\r\x1b[36m${frame}\x1b[0m ${message}...`);
+      this.currentFrame = (this.currentFrame + 1) % this.spinnerFrames.length;
+    }, 80);
+  }
+
+  /**
+   * Stop the loading spinner
+   */
+  stopSpinner(finalMessage?: string): void {
+    if (this.spinnerInterval) {
+      clearInterval(this.spinnerInterval);
+      this.spinnerInterval = null;
+
+      if (finalMessage) {
+        process.stdout.write(`\r\x1b[32m✓\x1b[0m ${finalMessage}\n`);
+      } else {
+        process.stdout.write('\r\x1b[K'); // Clear the line
+      }
+    }
+  }
 
   /**
    * Show an informational message
