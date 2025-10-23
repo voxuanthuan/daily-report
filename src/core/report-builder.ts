@@ -1,18 +1,44 @@
 export function buildMainReport(previousDayLabel: string, inProgress: any[], yesterdayTasks: any[]): string {
   let report = `Hi everyone,\n${previousDayLabel}\n`;
-  
+
+  // Deduplicate yesterday's tasks by key
+  const uniqueYesterdayTasks = deduplicateTasks(yesterdayTasks);
+
   // QC will report based on parent tasks cause subtask with no meaning content
-  report += yesterdayTasks.length > 0
-      ? yesterdayTasks.map((task) => `- ${task?.fields?.parent?.key || task?.key}: ${task?.fields?.parent?.fields?.summary || task?.fields?.summary}`).join('\n') + '\n'
+  report += uniqueYesterdayTasks.length > 0
+      ? uniqueYesterdayTasks.map((task) => `- ${task?.fields?.parent?.key || task?.key}: ${task?.fields?.parent?.fields?.summary || task?.fields?.summary}`).join('\n') + '\n'
       : '- No tasks logged.\n';
-  
+
   report += 'Today\n';
-  report += inProgress.length > 0
-      ? inProgress.map((task) => `- ${task?.fields?.parent?.key || task?.key}: ${task?.fields?.parent?.fields?.summary || task?.fields?.summary}`).join('\n') + '\n'
+
+  // Deduplicate today's tasks by key
+  const uniqueInProgress = deduplicateTasks(inProgress);
+
+  report += uniqueInProgress.length > 0
+      ? uniqueInProgress.map((task) => `- ${task?.fields?.parent?.key || task?.key}: ${task?.fields?.parent?.fields?.summary || task?.fields?.summary}`).join('\n') + '\n'
       : '- No tasks planned.\n';
-  
+
   report += 'No blockers\n\n';
   return report;
+}
+
+/**
+ * Deduplicate tasks by their key (or parent key for QC mode)
+ * When the same task appears multiple times (e.g., multiple time logs), keep only one
+ */
+function deduplicateTasks(tasks: any[]): any[] {
+  const seen = new Map<string, any>();
+
+  for (const task of tasks) {
+    // Use parent key if available (QC mode), otherwise use task key
+    const key = task?.fields?.parent?.key || task?.key;
+
+    if (key && !seen.has(key)) {
+      seen.set(key, task);
+    }
+  }
+
+  return Array.from(seen.values());
 }
 
 export function buildTodoList(openTasks: any[]): string {
