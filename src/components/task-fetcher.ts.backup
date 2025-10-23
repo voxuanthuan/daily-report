@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
 import moment from 'moment';
-import { apiHeaders, JIRA_API_TOKEN, JIRA_SERVER, JIRA_USERNAME } from './config-utils';
+import { apiHeaders, JIRA_API_TOKEN, JIRA_SERVER, JIRA_USERNAME, WHO_AM_I, IAM } from './config-utils';
 import TempoFetcher from './tempo/fetcher';
+
+const IS_QC = WHO_AM_I === IAM.QC;
 
 const GUIDE_GENERATE_TOKEN = 'https://confluence.atlassian.com/cloud/api-tokens-938839638.html';
 
@@ -34,8 +36,8 @@ export async function fetchUserDisplayName(): Promise<any> {
 }
 
 async function fetchBacklogTasks(): Promise<{ inProgress: any[]; open: any[] }> {
-    const jql = `assignee = '${JIRA_USERNAME}' AND status IN ('Open', 'In Progress')`;
-    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,subtasks,status,worklog,priority,issuetype`;
+    const jql = `assignee = '${JIRA_USERNAME}' AND status IN ('Selected for Development', 'Open', 'In Progress')`;
+    const url = `${JIRA_SERVER}/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=summary,subtasks,status,worklog,priority,issuetype${IS_QC ? ',parent' : ''}`;
 
     try {
         const response = await axios.get(url, { headers: apiHeaders });
@@ -48,7 +50,7 @@ async function fetchBacklogTasks(): Promise<{ inProgress: any[]; open: any[] }> 
 
         return {
             inProgress: tasksWithoutMeaningfulSubtasks.filter((task: any) => task.fields.status.name === 'In Progress'),
-            open: tasksWithoutMeaningfulSubtasks.filter((task: any) => task.fields.status.name === 'Open'),
+            open: tasksWithoutMeaningfulSubtasks.filter((task: any) => task.fields.status.name === 'Open' || task.fields.status.name === 'Selected for Development'),
         };
     } catch (error: any) {
         console.error(`Failed to fetch backlog tasks: ${error.message}`, error.response?.data);
@@ -66,16 +68,6 @@ function calculateWorklogHours(task: any, date: string): number {
     return Math.round(totalSeconds / 3600);
 }
 
-function getPreviousWorkday(): string {
-    const today = moment.tz('Australia/Sydney');
-    let previousDay = today.clone().subtract(1, 'day');
-  
-    while (previousDay.isoWeekday() > 5) {
-      previousDay.subtract(1, 'day');
-    }
-  
-    return previousDay.format('YYYY-MM-DD');
-  }
 
 async function fetchJiraIssueDetails(issueKey: string): Promise<JiraIssue | null> {
     if (!JIRA_SERVER) {
@@ -88,7 +80,7 @@ async function fetchJiraIssueDetails(issueKey: string): Promise<JiraIssue | null
       const errorMessage = `Jira API token is missing. Please configure Jira Tempo API token in settings. See ${GUIDE_GENERATE_TOKEN} for more info.`;
       vscode.window.showErrorMessage(errorMessage);
     }
-    const url = `${JIRA_SERVER}/rest/api/3/issue/${issueKey}?fields=summary,status`;
+    const url = `${JIRA_SERVER}/rest/api/3/issue/${issueKey}?fields=summary,status,issueType,priority${WHO_AM_I === IAM.QC ? ',parent' : ''}`;
     try {
       const response = await axios.get(url, { headers: apiHeaders });
       return response.data;
@@ -98,28 +90,52 @@ async function fetchJiraIssueDetails(issueKey: string): Promise<JiraIssue | null
     }
   }
   
-  // Fetch yesterday's tasks with full issue details
+  // Fetch yesterday's tasks with full issue details, with 5-day lookback
   export async function fetchPreviousWorkdayTasks(workerId: string): Promise<any[]> {
-    const previousDay = getPreviousWorkday();
     const tempoFetcher = new TempoFetcher(workerId);
-  
-    try {
-      const worklogs = await tempoFetcher.fetchWorklogs(previousDay, previousDay);
-      console.log(`Fetched ${worklogs.length} worklogs for ${previousDay}`);
-  
-      const filteredWorklogs = worklogs.filter(worklog =>
-        moment.tz(worklog.startDate, 'Australia/Sydney').format('YYYY-MM-DD') === previousDay
-      );
-  
-      // Fetch Jira issue details for each worklog
-      const issueDetailsPromises = filteredWorklogs.map(worklog =>
-        fetchJiraIssueDetails(worklog.issue.id)
-      );
-      const issueDetails = (await Promise.all(issueDetailsPromises)).filter((issue): issue is JiraIssue => issue !== null);
-  
-      return issueDetails;
-    } catch (error: any) {
-      console.error(`Failed to fetch worklogs for ${previousDay}: ${error.message}`);
-      return [];
+    const maxLookbackDays = 5;
+    
+    let currentDay = moment.tz('Australia/Sydney').subtract(1, 'day');
+    
+    // Skip weekends for the initial day
+    while (currentDay.isoWeekday() > 5) {
+      currentDay.subtract(1, 'day');
     }
+  
+    for (let i = 0; i < maxLookbackDays; i++) {
+      // Skip weekends
+      while (currentDay.isoWeekday() > 5) {
+        currentDay.subtract(1, 'day');
+      }
+      
+      const currentDateStr = currentDay.format('YYYY-MM-DD');
+      
+      try {
+        const worklogs = await tempoFetcher.fetchWorklogs(currentDateStr, currentDateStr);
+        console.log(`Fetched ${worklogs.length} worklogs for ${currentDateStr} (attempt ${i + 1}/${maxLookbackDays})`);
+    
+        const filteredWorklogs = worklogs.filter(worklog =>
+          moment.tz(worklog.startDate, 'Australia/Sydney').format('YYYY-MM-DD') === currentDateStr
+        );
+    
+        if (filteredWorklogs.length > 0) {
+          // Fetch Jira issue details for each worklog
+          const issueDetailsPromises = filteredWorklogs.map(worklog =>
+            fetchJiraIssueDetails(worklog.issue.id)
+          );
+          const issueDetails = (await Promise.all(issueDetailsPromises)).filter((issue): issue is JiraIssue => issue !== null);
+          
+          console.log(`Found ${issueDetails.length} tasks for ${currentDateStr}`);
+          return issueDetails;
+        }
+      } catch (error: any) {
+        console.error(`Failed to fetch worklogs for ${currentDateStr}: ${error.message}`);
+      }
+      
+      // Move to previous workday
+      currentDay.subtract(1, 'day');
+    }
+    
+    console.log(`No worklogs found in the last ${maxLookbackDays} workdays`);
+    return [];
   }

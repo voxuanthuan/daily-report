@@ -1,17 +1,44 @@
 export function buildMainReport(previousDayLabel: string, inProgress: any[], yesterdayTasks: any[]): string {
   let report = `Hi everyone,\n${previousDayLabel}\n`;
-  
-  report += yesterdayTasks.length > 0
-      ? yesterdayTasks.map((task) => `- ${task.key}: ${task.fields.summary}`).join('\n') + '\n'
+
+  // Deduplicate yesterday's tasks by key
+  const uniqueYesterdayTasks = deduplicateTasks(yesterdayTasks);
+
+  // QC will report based on parent tasks cause subtask with no meaning content
+  report += uniqueYesterdayTasks.length > 0
+      ? uniqueYesterdayTasks.map((task) => `- ${task?.fields?.parent?.key || task?.key}: ${task?.fields?.parent?.fields?.summary || task?.fields?.summary}`).join('\n') + '\n'
       : '- No tasks logged.\n';
-  
+
   report += 'Today\n';
-  report += inProgress.length > 0
-      ? inProgress.map((task) => `- ${task.key}: ${task.fields.summary}`).join('\n') + '\n'
+
+  // Deduplicate today's tasks by key
+  const uniqueInProgress = deduplicateTasks(inProgress);
+
+  report += uniqueInProgress.length > 0
+      ? uniqueInProgress.map((task) => `- ${task?.fields?.parent?.key || task?.key}: ${task?.fields?.parent?.fields?.summary || task?.fields?.summary}`).join('\n') + '\n'
       : '- No tasks planned.\n';
-  
+
   report += 'No blockers\n\n';
   return report;
+}
+
+/**
+ * Deduplicate tasks by their key (or parent key for QC mode)
+ * When the same task appears multiple times (e.g., multiple time logs), keep only one
+ */
+function deduplicateTasks(tasks: any[]): any[] {
+  const seen = new Map<string, any>();
+
+  for (const task of tasks) {
+    // Use parent key if available (QC mode), otherwise use task key
+    const key = task?.fields?.parent?.key || task?.key;
+
+    if (key && !seen.has(key)) {
+      seen.set(key, task);
+    }
+  }
+
+  return Array.from(seen.values());
 }
 
 export function buildTodoList(openTasks: any[]): string {
@@ -23,7 +50,6 @@ export function buildTodoList(openTasks: any[]): string {
       return todo;
   }
 
-  // shjt request from @longvo
   const sortedTasks = openTasks
       .sort((a, b) => {
           const priorityOrder: any = { 'High': 2, 'Medium': 1 };
@@ -60,26 +86,6 @@ export function buildTodoList(openTasks: any[]): string {
   }).join('\n');
 
   return todo;
-}
-
-export function buildTotalHoursNote(totalHours: number): string {
-  return totalHours < 8
-      ? `- 🕐 Last Logwork: ${totalHours}h \n`
-      : totalHours === 8
-      ? '- 🕐 Last Logwork: completed 👍\n'
-      : `- 🕐 Last Logwork: (${totalHours}) > 8h ⛔\n`;
-}
-
-export function buildNotes(totalHours: number, userDisplayName: string): string {
-  let notes = '\n\nNotes';
-  notes += `\nTodo List sorted by
-            - High > Medium
-            - Bug > task > sub-task > Story
-            - Limit 10 `;
-  notes += '\n- 📋 Clipboard: The report is copied to clipboard';
-  notes += '\n- 📅 TimeLog: Logwork just for reference, we got some edgecase can not fix this time. (Qc assign its self, tempo app time tracking)';
-
-  return notes;
 }
 
 export function combineReport(mainReport: string, timeLog: string, todoList: string, worklogs: string): string {

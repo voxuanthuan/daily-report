@@ -1,4 +1,12 @@
 # Changelog
+
+## [0.1.94]
+- 🐛 Fix: Jira API deprecated
+
+## [2.0.0]
+- 🐛 Feature: get last logtime for "yesteday" report
+## [1.0.0]
+- 🐛 Bug Fix: The Tempo app change API
 ## [1.0.4]
 - Feature: Apply Tempo Sheet
 - 🐛 Bug Fix: Show correct List "Yesterday" Task

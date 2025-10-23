@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import moment from 'moment';
-import { getPreviousWorkday } from '../components/date-utils';
+import { getPreviousWorkday } from '../core/date-utils';
 
 suite('Date Utility Tests', () => {
     test('Normal day: should return yesterday (subtract 1 day)', () => {

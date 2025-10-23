@@ -1,0 +1,10 @@
+{
+  "jiraServer": "https://your-domain.atlassian.net/",
+  "username": "your-email@example.com",
+  "apiToken": "your-jira-api-token",
+  "jiraTempoToken": "your-tempo-api-token",
+  "whoAmI": "Developer",
+  "autoClipboard": true,
+  "enableTimesheetIntegration": true,
+  "timesheetDateFormat": "YYYY-MM-DD"
+}

@@ -7,14 +7,15 @@ export function displayReport(finalReport: string) {
     output.show();
 }
 
-export async function copyToClipboard(report: string, autoClipboard: boolean) {
+export async function copyToClipboard(report: string, mainReportOnly: string, autoClipboard: boolean) {
     if (!autoClipboard) {
         vscode.window.showInformationMessage('Daily report generated!');
         return;
     }
 
     try {
-        await vscode.env.clipboard.writeText(report);
+        // Only copy the simplified main report format to clipboard
+        await vscode.env.clipboard.writeText(mainReportOnly);
         vscode.window.showInformationMessage('Daily report generated and copied to clipboard!');
     } catch (error) {
         console.error('Failed to copy to clipboard:', error);
