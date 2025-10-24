@@ -30,7 +30,7 @@ export WHO_AM_I="Developer"  # or "QC"
 source ~/.zshrc  # or ~/.bashrc
 ```
 
-#### 3. Generate Your Report
+### 3. Generate Your Report
 ### CLI Commands
 
 #### `jira-report generate`
