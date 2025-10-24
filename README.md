@@ -31,18 +31,17 @@ export WHO_AM_I="Developer"  # or "QC"
 source ~/.zshrc  # or ~/.bashrc
 ```
 
-### 3. Generate Your Report
-## CLI Commands
+### CLI Commands
 
 ##### `jira-report generate`
 
 
-## Requirements
+### Requirements
 
 - Node.js >= 16.0.0
 - Jira Server access with API token
 
-## Support
+### Support
 
 For help with setup, troubleshooting, or feature requests, please visit our [GitHub Issues](https://github.com/voxuanthuan/daily-report/issues) page.
 
