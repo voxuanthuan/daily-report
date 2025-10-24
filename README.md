@@ -10,6 +10,7 @@ Generate daily standup reports from Jira and Tempo time tracking - available as 
 ```bash
 # Global installation (recommended for CLI usage)
 pnpm install -g jira-daily-report
+```
 
 
 - **Jira API Token**: Get from https://id.atlassian.com/manage-profile/security/api-tokens
@@ -31,9 +32,9 @@ source ~/.zshrc  # or ~/.bashrc
 ```
 
 ### 3. Generate Your Report
-### CLI Commands
+## CLI Commands
 
-#### `jira-report generate`
+##### `jira-report generate`
 
 
 ## Requirements
