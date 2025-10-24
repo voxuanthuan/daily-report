@@ -17,7 +17,7 @@ npx jira-daily-report generate
 
 
 - **Jira API Token**: Get from https://id.atlassian.com/manage-profile/security/api-tokens
-- **Tempo API Token**: Get from https://{your-domain}.atlassian.net/plugins/servlet/ac/io.tempo.jira/tempo-app#!/configuration/api-integration
+- **Tempo API Token**: Get from https://your-domain.atlassian.net/plugins/servlet/ac/io.tempo.jira/tempo-app#!/configuration/api-integration
 
 **Or use environment variables:**
 
