@@ -2,7 +2,7 @@
   "name": "jira-daily-report",
   "displayName": "jira-daily-report",
   "description": "Generate Jira daily standup reports - VS Code extension and CLI tool",
-  "version": "0.1.105",
+  "version": "0.1.106",
   "publisher": "thuanvo",
   "author": {
     "name": "Thuan Vo",
