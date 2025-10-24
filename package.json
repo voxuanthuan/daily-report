@@ -143,6 +143,7 @@
     "images/",
     "CLI.md",
     "README.md",
+    "README-vscode.md",
     "LICENSE"
   ],
   "scripts": {
