@@ -49,6 +49,8 @@ jira-report logtime "B2B-1079 2h" --description "Bug fix"
 
 **Time formats:** `2h`, `1.5h`, `30m`, `1h 30m`
 
-## License
+## Contribute
 
-MIT
+Found a bug or have a feature idea? [Open an issue](https://github.com/voxuanthuan/daily-report/issues) or submit a PR!
+
+Also available as a [VS Code extension](https://marketplace.visualstudio.com/items?itemName=thuanvo.jira-daily-report)
