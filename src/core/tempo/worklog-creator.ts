@@ -1,10 +1,18 @@
-import * as vscode from 'vscode';
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
-import { getTempoApiToken, TEMPO_URL, getJiraServer, getApiHeaders } from '../../components/config-utils';
 import moment from 'moment-timezone';
 import TimesheetParser, { TimesheetEntry } from './timesheet-parser';
 
+// Conditionally import vscode only if available
+let vscode: any;
+try {
+  vscode = require('vscode');
+} catch {
+  // Running in CLI context, vscode not available
+  vscode = undefined;
+}
+
 const TEMPO_API_DOCS_LINK = 'https://apidocs.tempo.io/v4';
+const TEMPO_URL = 'https://api.tempo.io/4';
 
 // Tempo API v4 interfaces
 interface CreateWorklogRequest {
@@ -58,28 +66,62 @@ interface WorklogCreationResult {
   timeSpent: string;
 }
 
+export interface TempoWorklogCreatorConfig {
+  tempoApiToken: string;
+  jiraServer: string;
+  jiraAuthHeader: string;
+}
+
 export class TempoWorklogCreator {
   private tempoAxios: AxiosInstance;
   private jiraAxios: AxiosInstance;
   private authorAccountId: string;
   private timezone: string = 'Australia/Sydney';
+  private tempoApiToken: string;
 
-  constructor(authorAccountId: string) {
+  constructor(authorAccountId: string, config?: TempoWorklogCreatorConfig) {
     this.authorAccountId = authorAccountId;
-    
+
+    // Get config from parameter or fall back to VS Code config-utils
+    let tempoToken: string;
+    let jiraServer: string;
+    let authHeader: string;
+
+    if (config) {
+      // CLI or custom configuration
+      tempoToken = config.tempoApiToken;
+      jiraServer = config.jiraServer;
+      authHeader = config.jiraAuthHeader;
+    } else {
+      // VS Code extension context - use config-utils
+      try {
+        const configUtils = require('../../components/config-utils');
+        tempoToken = configUtils.getTempoApiToken();
+        jiraServer = configUtils.getJiraServer();
+        authHeader = configUtils.getAuthHeader();
+      } catch {
+        throw new Error('Configuration not provided and VS Code config not available');
+      }
+    }
+
+    this.tempoApiToken = tempoToken;
+
     // Tempo API instance
     this.tempoAxios = axios.create({
       baseURL: TEMPO_URL,
       headers: {
-        Authorization: `Bearer ${getTempoApiToken()}`,
+        Authorization: `Bearer ${tempoToken}`,
         'Content-Type': 'application/json',
       },
     });
-    
+
     // Jira API instance
     this.jiraAxios = axios.create({
-      baseURL: getJiraServer(),
-      headers: getApiHeaders(),
+      baseURL: jiraServer,
+      headers: {
+        Authorization: authHeader,
+        'Content-Type': 'application/json'
+      },
     });
   }
 
@@ -118,9 +160,11 @@ export class TempoWorklogCreator {
     description?: string,
     startTime?: string
   ): Promise<WorklogCreationResult> {
-    if (!getTempoApiToken()) {
+    if (!this.tempoApiToken) {
       const error = `Tempo API token is missing. Please configure it in settings. See ${TEMPO_API_DOCS_LINK}`;
-      vscode.window.showErrorMessage(error);
+      if (vscode?.window?.showErrorMessage) {
+        vscode.window.showErrorMessage(error);
+      }
       return { success: false, error, ticketKey: issueKey, timeSpent: TimesheetParser.formatSecondsToTime(timeSpentSeconds) };
     }
 
@@ -181,13 +225,17 @@ export class TempoWorklogCreator {
   async createWorklogsFromTimesheet(
     timesheetLog: string,
     startDate?: string,
-    description?: string
+    description?: string,
+    progressCallback?: (current: number, total: number, ticketKey: string) => void
   ): Promise<WorklogCreationResult[]> {
     const parsed = TimesheetParser.parseTimesheetLog(timesheetLog);
-    
+
     if (!parsed.isValid) {
       const error = `Invalid timesheet format: ${parsed.errors.join(', ')}`;
-      vscode.window.showErrorMessage(error);
+      // Only show error message if vscode is available (VS Code extension context)
+      if (vscode?.window?.showErrorMessage) {
+        vscode.window.showErrorMessage(error);
+      }
       return [{
         success: false,
         error,
@@ -199,24 +247,57 @@ export class TempoWorklogCreator {
     const targetDate = startDate || moment.tz(this.timezone).format('YYYY-MM-DD');
     const results: WorklogCreationResult[] = [];
 
-    // Show progress for multiple entries
-    const progressOptions = {
-      location: vscode.ProgressLocation.Notification,
-      title: 'Creating Tempo Worklogs',
-      cancellable: false
-    };
+    // Check if running in VS Code extension context
+    const isVSCode = vscode?.window?.withProgress !== undefined;
 
-    return vscode.window.withProgress(progressOptions, async (progress) => {
+    if (isVSCode) {
+      // Show progress for multiple entries (VS Code only)
+      const progressOptions = {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Creating Tempo Worklogs',
+        cancellable: false
+      };
+
+      return vscode.window.withProgress(progressOptions, async (progress: any) => {
+        const totalEntries = parsed.entries.length;
+
+        for (let i = 0; i < parsed.entries.length; i++) {
+          const entry = parsed.entries[i];
+          const progressPercent = ((i + 1) / totalEntries) * 100;
+
+          progress.report({
+            message: `Creating worklog ${i + 1}/${totalEntries}: ${entry.ticketKey}`,
+            increment: progressPercent / totalEntries
+          });
+
+          const worklogDescription = description || `Timesheet entry: ${entry.rawText}`;
+          const result = await this.createWorklog(
+            entry.ticketKey,
+            entry.timeSpentSeconds,
+            targetDate,
+            worklogDescription
+          );
+
+          results.push(result);
+
+          // Small delay to avoid rate limiting
+          if (i < parsed.entries.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+
+        return results;
+      });
+    } else {
+      // CLI context - use callback for progress
       const totalEntries = parsed.entries.length;
-      
+
       for (let i = 0; i < parsed.entries.length; i++) {
         const entry = parsed.entries[i];
-        const progressPercent = ((i + 1) / totalEntries) * 100;
-        
-        progress.report({
-          message: `Creating worklog ${i + 1}/${totalEntries}: ${entry.ticketKey}`,
-          increment: progressPercent / totalEntries
-        });
+
+        if (progressCallback) {
+          progressCallback(i + 1, totalEntries, entry.ticketKey);
+        }
 
         const worklogDescription = description || `Timesheet entry: ${entry.rawText}`;
         const result = await this.createWorklog(
@@ -225,9 +306,9 @@ export class TempoWorklogCreator {
           targetDate,
           worklogDescription
         );
-        
+
         results.push(result);
-        
+
         // Small delay to avoid rate limiting
         if (i < parsed.entries.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -235,7 +316,7 @@ export class TempoWorklogCreator {
       }
 
       return results;
-    });
+    }
   }
 
   /**
