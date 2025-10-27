@@ -22,7 +22,7 @@ export async function generateDailyReport(
         useCache?: boolean;
     } = {}
 ) {
-    outputManager.startSpinner('Generating daily report');
+    outputManager.startSpinner('Generating');
 
     try {
         // Get configuration
@@ -38,12 +38,19 @@ export async function generateDailyReport(
 
         const { open, inProgress } = tasks;
 
+        // Update progress with task count
+        const totalTasks = open.length + inProgress.length;
+        outputManager.updateProgress(totalTasks);
+
         const tempoApiToken = await configManager.getTempoApiToken();
         const fetcher = new TempoFetcher(user.accountId, tempoApiToken);
         const formatter = new TempoFormatter();
 
         // Optimize: Fetch all worklogs in one call, then extract what we need
         const allWorklogs = await fetcher.fetchLastSixDaysWorklogs();
+
+        // Update progress with worklog count
+        outputManager.updateProgress(totalTasks, allWorklogs.length);
 
         // Extract previous workday data from the existing worklog data
         const previousWorkdayResult = await extractPreviousWorkdayTasks(allWorklogs, user.accountId, configManager);
@@ -61,8 +68,8 @@ export async function generateDailyReport(
         // Combine all report sections for display
         const finalReport = combineReport(mainReport, '', todoList, workLogContent);
 
-        // Stop spinner before displaying report
-        outputManager.stopSpinner('Report generated successfully');
+        // Stop spinner before displaying report (clear the line completely)
+        outputManager.stopSpinner();
 
         // Display the report and optionally copy to clipboard
         await outputManager.displayReport(finalReport, autoClipboard);

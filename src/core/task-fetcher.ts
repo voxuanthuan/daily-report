@@ -179,7 +179,6 @@ async function fetchJiraIssueDetails(issueKey: string, configManager: ConfigMana
   // Extract previous workday tasks from existing worklog data (no additional API calls)
   export async function extractPreviousWorkdayTasks(allWorklogs: any[], workerId: string, configManager: ConfigManager): Promise<PreviousWorkdayResult> {
     if (allWorklogs.length === 0) {
-      console.log('No worklogs provided for extraction');
       return { tasks: [], actualDate: null };
     }
 
@@ -213,14 +212,12 @@ async function fetchJiraIssueDetails(issueKey: string, configManager: ConfigMana
         );
         const issueDetails = (await Promise.all(issueDetailsPromises)).filter((issue): issue is JiraIssue => issue !== null);
 
-        console.log(`Extracted ${issueDetails.length} tasks from existing data for: ${currentDateStr}`);
         return { tasks: issueDetails, actualDate: currentDateStr };
       }
 
       currentDay.subtract(1, 'day');
     }
 
-    console.log('No worklogs found on working days in existing data');
     return { tasks: [], actualDate: null };
   }
   
