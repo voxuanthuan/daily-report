@@ -1,5 +1,5 @@
 export function buildMainReport(previousDayLabel: string, inProgress: any[], yesterdayTasks: any[]): string {
-  let report = `Hi everyone,\n${previousDayLabel}\n`;
+  let report = `\nHi everyone,\n${previousDayLabel}\n`;
 
   // Deduplicate yesterday's tasks by key
   const uniqueYesterdayTasks = deduplicateTasks(yesterdayTasks);
