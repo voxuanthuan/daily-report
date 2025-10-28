@@ -14,8 +14,14 @@ export function buildMainReport(previousDayLabel: string, inProgress: any[], yes
   // Deduplicate today's tasks by key
   const uniqueInProgress = deduplicateTasks(inProgress);
 
-  report += uniqueInProgress.length > 0
-      ? uniqueInProgress.map((task) => `- ${task?.fields?.parent?.key || task?.key}: ${task?.fields?.parent?.fields?.summary || task?.fields?.summary}`).join('\n') + '\n'
+  // Separate stories/epics from tasks/bugs
+  const todayNonStories = uniqueInProgress.filter((task) => {
+    const issueType = task?.fields?.issuetype?.name;
+    return issueType !== 'Story' && issueType !== 'Epic';
+  });
+
+  report += todayNonStories.length > 0
+      ? todayNonStories.map((task) => `- ${task?.fields?.parent?.key || task?.key}: ${task?.fields?.parent?.fields?.summary || task?.fields?.summary}`).join('\n') + '\n'
       : '- No tasks planned.\n';
 
   report += 'No blockers\n\n';
@@ -41,9 +47,31 @@ function deduplicateTasks(tasks: any[]): any[] {
   return Array.from(seen.values());
 }
 
+export function buildInProgressStories(inProgress: any[]): string {
+  // Deduplicate tasks by key
+  const uniqueInProgress = deduplicateTasks(inProgress);
+
+  // Filter only stories and epics
+  const stories = uniqueInProgress.filter((task) => {
+    const issueType = task?.fields?.issuetype?.name;
+    return issueType === 'Story' || issueType === 'Epic';
+  });
+
+  if (stories.length === 0) {
+      return '';
+  }
+
+  let section = '-------------------------------------------------------------\n\n';
+  section += 'Stories (in-progress)\n';
+  section += stories.map((task) => `- ${task?.fields?.parent?.key || task?.key}: ${task?.fields?.parent?.fields?.summary || task?.fields?.summary}`).join('\n');
+  section += '\n\n';
+
+  return section;
+}
+
 export function buildTodoList(openTasks: any[]): string {
   let todo = '-------------------------------------------------------------\n\n';
-  todo += 'To Do List\n';
+  todo += 'Todo \n';
 
   if (openTasks.length === 0) {
       todo += '- No tasks available.';
@@ -88,6 +116,6 @@ export function buildTodoList(openTasks: any[]): string {
   return todo;
 }
 
-export function combineReport(mainReport: string, timeLog: string, todoList: string, worklogs: string): string {
-  return `${mainReport}${timeLog}${todoList}${worklogs}`;
+export function combineReport(mainReport: string, timeLog: string, inProgressStories: string, todoList: string, worklogs: string): string {
+  return `${mainReport}${timeLog}${inProgressStories}${todoList}${worklogs}`;
 }

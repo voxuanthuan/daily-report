@@ -2,7 +2,7 @@ import { ConfigManager } from './config';
 import { OutputManager } from './output';
 import { getSmartDateLabel } from './date-utils';
 import { fetchAllTasks, fetchUserDisplayName, extractPreviousWorkdayTasks } from './task-fetcher';
-import { buildMainReport, buildTodoList, combineReport } from './report-builder';
+import { buildMainReport, buildTodoList, buildInProgressStories, combineReport } from './report-builder';
 import TempoFetcher from './tempo/fetcher';
 import TempoFormatter from './tempo/formatter';
 
@@ -59,14 +59,15 @@ export async function generateDailyReport(
         const smartDateLabel = getSmartDateLabel(previousWorkdayResult.actualDate);
 
         // Build main report sections in parallel where possible
-        const [mainReport, todoList, workLogContent] = await Promise.all([
+        const [mainReport, inProgressStories, todoList, workLogContent] = await Promise.all([
             Promise.resolve(buildMainReport(smartDateLabel, inProgress, previousWorkdayResult.tasks)),
+            Promise.resolve(buildInProgressStories(inProgress)),
             Promise.resolve(buildTodoList(open)),
             Promise.resolve(formatter.formatWorkLogContent(allWorklogs))
         ]);
 
         // Combine all report sections for display
-        const finalReport = combineReport(mainReport, '', todoList, workLogContent);
+        const finalReport = combineReport(mainReport, '', inProgressStories, todoList, workLogContent);
 
         // Stop spinner before displaying report (clear the line completely)
         outputManager.stopSpinner();
