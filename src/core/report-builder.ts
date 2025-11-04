@@ -24,7 +24,20 @@ export function buildMainReport(previousDayLabel: string, inProgress: any[], yes
       ? todayNonStories.map((task) => `- ${task?.fields?.parent?.key || task?.key}: ${task?.fields?.parent?.fields?.summary || task?.fields?.summary}`).join('\n') + '\n'
       : '- No tasks planned.\n';
 
-  report += 'No blockers\n\n';
+  report += 'No blockers\n';
+
+  // Add in-progress stories in the same section
+  const stories = uniqueInProgress.filter((task) => {
+    const issueType = task?.fields?.issuetype?.name;
+    return issueType === 'Story' || issueType === 'Epic';
+  });
+
+  if (stories.length > 0) {
+    report += '\n.\n\nIn-Progress (Story))\n';
+    report += stories.map((task) => `- ${task?.fields?.parent?.key || task?.key}: ${task?.fields?.parent?.fields?.summary || task?.fields?.summary}`).join('\n') + '\n';
+  }
+
+  report += '\n';
   return report;
 }
 
@@ -48,69 +61,80 @@ function deduplicateTasks(tasks: any[]): any[] {
 }
 
 export function buildInProgressStories(inProgress: any[]): string {
-  // Deduplicate tasks by key
-  const uniqueInProgress = deduplicateTasks(inProgress);
+  // This function is no longer used as stories are now in the main report
+  return '';
+}
 
-  // Filter only stories and epics
+export function buildTodoList(openTasks: any[], inProgress: any[] = []): string {
+  let todo = '\n─────────────────────────────────────────────────────────────────\n\n';
+  todo += 'Todo\n';
+
+  // Get in-progress stories/epics
+  const uniqueInProgress = deduplicateTasks(inProgress);
   const stories = uniqueInProgress.filter((task) => {
     const issueType = task?.fields?.issuetype?.name;
     return issueType === 'Story' || issueType === 'Epic';
   });
 
-  if (stories.length === 0) {
-      return '';
-  }
+  // Sort in-progress stories
+  const sortedStories = stories.sort((a, b) => {
+      const priorityOrder: any = { 'High': 2, 'Medium': 1 };
+      const aPriority  = priorityOrder[a.fields.priority?.name] || 0;
+      const bPriority = priorityOrder[b.fields.priority?.name] || 0;
+      if (aPriority !== bPriority) {return bPriority - aPriority;}
+      return a.key.localeCompare(b.key);
+  });
 
-  let section = '-------------------------------------------------------------\n\n';
-  section += 'Stories (in-progress)\n';
-  section += stories.map((task) => `- ${task?.fields?.parent?.key || task?.key}: ${task?.fields?.parent?.fields?.summary || task?.fields?.summary}`).join('\n');
-  section += '\n\n';
+  // Sort open tasks
+  const sortedOpenTasks = openTasks.sort((a, b) => {
+      const priorityOrder: any = { 'High': 2, 'Medium': 1 };
+      const aPriority  = priorityOrder[a.fields.priority?.name] || 0;
+      const bPriority = priorityOrder[b.fields.priority?.name] || 0;
+      if (aPriority !== bPriority) {return bPriority - aPriority;}
 
-  return section;
-}
+      const typeOrder: any = { 'Bug': 4, 'Task': 3, 'Sub-task': 2, 'Story': 1 };
+      const aType = typeOrder[a.fields.issuetype?.name] || 0;
+      const bType = typeOrder[b.fields.issuetype?.name] || 0;
+      if (aType !== bType) {return bType - aType;}
 
-export function buildTodoList(openTasks: any[]): string {
-  let todo = '-------------------------------------------------------------\n\n';
-  todo += 'Todo \n';
+      return a.key.localeCompare(b.key);
+  });
 
-  if (openTasks.length === 0) {
+  // Combine: in-progress first, then open tasks, limit to 10 total
+  const allTasks = [...sortedOpenTasks].slice(0, 10);
+
+  if (allTasks.length === 0) {
       todo += '- No tasks available.';
       return todo;
   }
 
-  const sortedTasks = openTasks
-      .sort((a, b) => {
-          const priorityOrder: any = { 'High': 2, 'Medium': 1 };
-          const aPriority  = priorityOrder[a.fields.priority?.name] || 0;
-          const bPriority = priorityOrder[b.fields.priority?.name] || 0;
-          if (aPriority !== bPriority) {return bPriority - aPriority;}
-
-          const typeOrder: any = { 'Bug': 4, 'Task': 3, 'Sub-task': 2, 'Story': 1 };
-          const aType = typeOrder[a.fields.issuetype?.name] || 0;
-          const bType = typeOrder[b.fields.issuetype?.name] || 0;
-          if (aType !== bType) {return bType - aType;}
-
-          return a.key.localeCompare(b.key);
-      })
-      .slice(0, 10); // Limit to top 10 tasks
+  // Create a Set of in-progress task keys for quick lookup
+  const inProgressKeys = new Set(sortedStories.map(task => task.key));
 
   // Map tasks with Jira-like icons
-  todo += sortedTasks.map((task) => {
+  todo += allTasks.map((task) => {
       let icon = '';
       switch (task.fields.issuetype?.name) {
           case 'Bug':
-              icon = '🟥';
+              icon = '🔴';
               break;
           case 'Sub-task':
-              icon = '🟦';
+              icon = '🔵';
               break;
           case 'Story':
-              icon = '🟩';
+              icon = '🟢';
+              break;
+          case 'Task':
+              icon = '🟢';
               break;
           default:
-              icon = '🟩';
+              icon = '🟢';
       }
-      return ` ${icon} - ${task.key}: ${task?.fields?.summary}`;
+
+      // Add in-progress indicator for stories/epics that are in progress
+      const inProgressIndicator = inProgressKeys.has(task.key) ? '⏳ ' : '';
+
+      return ` ${icon} ${inProgressIndicator}${task.key}: ${task?.fields?.summary}`;
   }).join('\n');
 
   return todo;

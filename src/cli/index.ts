@@ -192,6 +192,34 @@ program
     }
   });
 
+// Open ticket command
+program
+  .command('open <ticketId>')
+  .description('Open Jira ticket in browser (e.g., "GRAP-123")')
+  .action(async (ticketId: string) => {
+    try {
+      // Initialize config provider
+      const configProvider = new CLIConfigProvider();
+      await configProvider.initialize();
+      const configManager = new ConfigManager(configProvider);
+
+      // Get Jira server URL
+      const jiraServer = await configManager.getJiraServer();
+      const ticketUrl = `${jiraServer}browse/${ticketId}`;
+
+      console.log(`\x1b[36m🔗\x1b[0m Opening: ${ticketUrl}`);
+
+      // Import open dynamically to avoid ESM issues
+      const open = await import('open');
+      await open.default(ticketUrl);
+
+      console.log('\x1b[32m✓\x1b[0m Opened in browser');
+    } catch (error) {
+      console.error('\x1b[31m✖\x1b[0m Error:', error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
 // Config command
 const configCommand = program
   .command('config')

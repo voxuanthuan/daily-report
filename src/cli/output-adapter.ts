@@ -1,5 +1,6 @@
 import { IOutputProvider } from '../core/output';
 import * as fs from 'fs';
+import moment from 'moment-timezone';
 
 /**
  * CLI implementation of IOutputProvider
@@ -14,6 +15,117 @@ export class CLIOutputProvider implements IOutputProvider {
   private tokenCount = 0;
   private targetTokenCount = 0;
   private displayTokenCount = 0;
+
+  // Minh Tran ASCII art frames (Wednesday) - Left to Right movement
+  private minhTranFrames = [
+    // Frame 0 - Far left
+    `__  __ _       _       _____
+\\/  (_)_ __ | |__   |_   _| __ __ _ _ __
+|\\/| | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
+|  | | | | | | | | |   | || | | (_| | | | |
+|  |_|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
+    // Frame 1 - Moving right
+    ` __  __ _       _       _____
+|  \\/  (_)_ __ | |__   |_   _| __ __ _ _ __
+| |\\/| | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
+| |  | | | | | | | | |   | || | | (_| | | | |
+|_|  |_|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
+    // Frame 2 - Moving right
+    `  __  __ _       _       _____
+ |  \\/  (_)_ __ | |__   |_   _| __ __ _ _ __
+ | |\\/| | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
+ | |  | | | | | | | | |   | || | | (_| | | | |
+ |_|  |_|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
+    // Frame 3 - Moving right
+    `   __  __ _       _       _____
+  |  \\/  (_)_ __ | |__   |_   _| __ __ _ _ __
+  | |\\/| | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
+  | |  | | | | | | | | |   | || | | (_| | | | |
+  |_|  |_|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
+    // Frame 4 - Final position (center-right)
+    `    __  __ _       _       _____
+   |  \\/  (_)_ __ | |__   |_   _| __ __ _ _ __
+   | |\\/| | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
+   | |  | | | | | | | | |   | || | | (_| | | | |
+   |_|  |_|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
+  ];
+
+  // Linh Tran ASCII art frames (Thursday) - Left to Right movement
+  private linhTranFrames = [
+    // Frame 0 - Far left
+    `_     _       _       _____
+|   (_)_ __ | |__   |_   _| __ __ _ _ __
+|   | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
+|___| | | | | | | |   | || | | (_| | | | |
+____|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
+    // Frame 1 - Moving right
+    ` _     _       _       _____
+| |   (_)_ __ | |__   |_   _| __ __ _ _ __
+| |   | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
+| |___| | | | | | | |   | || | | (_| | | | |
+|_____|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
+    // Frame 2 - Moving right
+    `  _     _       _       _____
+ | |   (_)_ __ | |__   |_   _| __ __ _ _ __
+ | |   | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
+ | |___| | | | | | | |   | || | | (_| | | | |
+ |_____|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
+    // Frame 3 - Moving right
+    `   _     _       _       _____
+  | |   (_)_ __ | |__   |_   _| __ __ _ _ __
+  | |   | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
+  | |___| | | | | | | |   | || | | (_| | | | |
+  |_____|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
+    // Frame 4 - Final position (center-right)
+    `    _     _       _       _____
+   | |   (_)_ __ | |__   |_   _| __ __ _ _ __
+   | |   | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
+   | |___| | | | | | | |   | || | | (_| | | | |
+   |_____|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
+  ];
+
+  // Jun ASCII art frames (All other days) - Left to Right movement
+  private junFrames = [
+    // Frame 0 - Far left
+    `    _
+   | |_   _ _ __
+_  | | | | | '_ \\
+|_| | |_| | | | |
+\\__/ \\__,_|_| |_|`,
+    // Frame 1 - Moving right
+    `     _
+    | |_   _ _ __
+ _  | | | | | '_ \\
+| |_| | |_| | | | |
+ \\___/ \\__,_|_| |_|`,
+    // Frame 2 - Moving right
+    `      _
+     | |_   _ _ __
+  _  | | | | | '_ \\
+ | |_| | |_| | | | |
+  \\___/ \\__,_|_| |_|`,
+    // Frame 3 - Moving right
+    `       _
+      | |_   _ _ __
+   _  | | | | | '_ \\
+  | |_| | |_| | | | |
+   \\___/ \\__,_|_| |_|`,
+    // Frame 4 - Final position (center-right)
+    `        _
+       | |_   _ _ __
+    _  | | | | | '_ \\
+   | |_| | |_| | | | |
+    \\___/ \\__,_|_| |_|`,
+  ];
+
+  // Current ASCII text frames (will be set based on day of week)
+  private asciiTextFrames: string[] = [];
+
+  // Loading animation dots
+  private loadingDots = ['   ', '.  ', '.. ', '...'];
+
+  // Rotation spinner frames
+  private spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
   // Claude Code starburst/asterisk icon frames (animated rotation)
   private starburstFrames = [
@@ -59,7 +171,19 @@ export class CLIOutputProvider implements IOutputProvider {
       silent?: boolean;
       outputFile?: string;
     } = {}
-  ) {}
+  ) {
+    // Set ASCII text based on day of week (Australia/Sydney timezone)
+    const dayOfWeek = moment.tz('Australia/Sydney').format('dddd');
+
+    if (dayOfWeek === 'Wednesday') {
+      this.asciiTextFrames = this.minhTranFrames;
+    } else if (dayOfWeek === 'Thursday') {
+      this.asciiTextFrames = this.linhTranFrames;
+    } else {
+      // Monday, Tuesday, Friday, Saturday, Sunday - Show Jun
+      this.asciiTextFrames = this.junFrames;
+    }
+  }
 
   /**
    * Start a loading spinner with a message
@@ -71,48 +195,33 @@ export class CLIOutputProvider implements IOutputProvider {
 
     this.currentFrame = 0;
     this.startTime = Date.now();
-    // Don't add extra newline before spinner
+    let textPosition = 0; // Track text movement position
 
+    // Show ASCII text with animated loading dots and rotation
     this.spinnerInterval = setInterval(() => {
-      const frameIdx = this.currentFrame % this.starburstFrames.length;
+      const dotsIdx = this.currentFrame % this.loadingDots.length;
+      const dots = this.loadingDots[dotsIdx];
+      const spinnerIdx = this.currentFrame % this.spinnerFrames.length;
+      const spinner = this.spinnerFrames[spinnerIdx];
       const colorIdx = this.currentFrame % this.logoColors.length;
-      const logo = this.starburstFrames[frameIdx];
-      const iconColor = this.logoColors[colorIdx];
+      const textColor = this.logoColors[colorIdx];
 
-      // Text color changes slower - every 2 frames (or adjust divisor for slower/faster)
-      const textColorIdx = Math.floor(this.currentFrame / 2) % this.logoColors.length;
-      const textColor = this.logoColors[textColorIdx];
-
-      // Calculate elapsed time (no decimal)
-      const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
-
-      // Incrementally increase display token count towards target (like Claude Code)
-      if (this.displayTokenCount < this.targetTokenCount) {
-        // Increment by steps to make it smooth but fast
-        const increment = Math.max(1, Math.ceil((this.targetTokenCount - this.displayTokenCount) / 20));
-        this.displayTokenCount = Math.min(this.displayTokenCount + increment, this.targetTokenCount);
+      // Move text from left to right, then stop at final position
+      // Text moves slower than spinner/color (every 3 frames)
+      if (this.currentFrame % 3 === 0 && textPosition < this.asciiTextFrames.length - 1) {
+        textPosition++;
       }
 
-      // Build progress info string (token count like Claude Code)
-      let progressInfo = '';
-      if (this.displayTokenCount > 0) {
-        // Format token count with thousands separator and ↓ symbol
-        const formattedTokens = this.displayTokenCount.toLocaleString();
-        progressInfo = ` · ↓ ${formattedTokens} tokens`;
-      }
+      // Use the current text position (stops at final frame)
+      const asciiText = this.asciiTextFrames[textPosition];
 
-      // Build the full message with shortcuts
-      const shortcuts = '\x1b[90m(esc to interrupt · \x1b[0m';
-      const timeAndTokens = `\x1b[90m${elapsed}s${progressInfo})\x1b[0m`;
-
-      // Display Claude logo animation with progress (like Claude Code style)
-      // Icon color changes every frame, text color changes slower
-      process.stdout.write(
-        `\r\x1b[K  ${iconColor}${logo}\x1b[0m  ${textColor}${message}...\x1b[0m ${shortcuts}${timeAndTokens}`
-      );
+      // Clear screen and show ASCII art with loading dots and spinner
+      process.stdout.write('\x1b[2J\x1b[H'); // Clear screen and move cursor to top
+      process.stdout.write(`${textColor}${asciiText}\x1b[0m\n\n`);
+      process.stdout.write(`  ${spinner} ${message}${dots}\n`);
 
       this.currentFrame++;
-    }, 150);
+    }, 100); // Adjusted timing for smooth rotation
   }
 
   /**
@@ -123,8 +232,8 @@ export class CLIOutputProvider implements IOutputProvider {
       clearInterval(this.spinnerInterval);
       this.spinnerInterval = null;
 
-      // Clear the loading line completely (like Claude Code does)
-      process.stdout.write('\r\x1b[K');
+      // Clear the entire screen to remove ASCII art
+      process.stdout.write('\x1b[2J\x1b[H');
 
       // Optionally show a subtle completion message
       if (finalMessage) {

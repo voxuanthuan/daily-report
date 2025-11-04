@@ -10,6 +10,14 @@ interface Worklog {
 }
 
 class TempoFormatter {
+  /**
+   * Format hours to remove unnecessary trailing zeros
+   * 8.00 -> 8, 7.50 -> 7.5, 0.00 -> 0
+   */
+  private formatHours(hours: number): string {
+    return hours % 1 === 0 ? hours.toString() : hours.toFixed(2).replace(/\.?0+$/, '');
+  }
+
   private getLastWeekThreeWorkingDays(): { date: string; name: string }[] {
     const today = moment.tz('Australia/Sydney');
     const days: { date: string; name: string }[] = [];
@@ -93,11 +101,7 @@ class TempoFormatter {
       hoursByDay[day.date] = (worklogsByDay[day.date] || []).reduce((sum, log) => sum + log.timeSpentSeconds, 0) / 3600;
     });
 
-    const colWidths = { day: 12, hours: 10 };
-    const header = [
-      `| ${'Date'.padEnd(colWidths.day)} | ${'Hours'.padEnd(colWidths.hours)} |`,
-      `|${'-'.repeat(colWidths.day + 2)}|${'-'.repeat(colWidths.hours + 2)}|\n`,
-    ];
+    const colWidths = { day: 14, hours: 10 };
 
     // Calculate total hours for the full last week
     const lastWeekTotalHoursRaw = lastWeekFullDays.reduce((sum, day) => sum + (hoursByDay[day.date] || 0), 0);
@@ -108,24 +112,25 @@ class TempoFormatter {
 
     // Format last week's rows (only 3 days), adding total on the last row
     const lastWeekRows = lastWeekDisplayDays.map((day, index) => {
-      const hours = hoursByDay[day.date].toFixed(2);
+      const hours = this.formatHours(hoursByDay[day.date]);
       const isLastDay = index === lastWeekDisplayDays.length - 1;
-      return `| ${day.name.padEnd(colWidths.day)} | ${hours.padEnd(colWidths.hours)} |${isLastDay ? ` ${lastWeekTotalDisplay}` : ''}`;
+      return `│ ${day.name.padEnd(colWidths.day)} │ ${hours.padEnd(colWidths.hours)} │${isLastDay ? ` ${lastWeekTotalDisplay}` : ''}`;
     });
 
     const thisWeekRows = thisWeekDays.map((day) => {
-      const hours = hoursByDay[day.date].toFixed(2);
-      return `| ${day.name.padEnd(colWidths.day)} | ${hours.padEnd(colWidths.hours)} |`;
+      const hours = this.formatHours(hoursByDay[day.date]);
+      return `│ ${day.name.padEnd(colWidths.day)} │ ${hours.padEnd(colWidths.hours)} │`;
     });
 
-    content += '\n-------------------------------------------------------------\n\n';
-    content += header.join('\n');
-    content += `| ${'...'.padEnd(colWidths.day)} | ${''.padEnd(colWidths.hours)} |\n`;
+    content += '\n─────────────────────────────────────────────────────────────────\n\n';
+    content += `┌${'─'.repeat(colWidths.day + 2)}┬${'─'.repeat(colWidths.hours + 2)}┐\n`;
+    content += `│ ${'Date'.padEnd(colWidths.day)} │ ${'Hours'.padEnd(colWidths.hours)} │\n`;
+    content += `├${'─'.repeat(colWidths.day + 2)}┼${'─'.repeat(colWidths.hours + 2)}┤\n`;
+    content += `│ ${'...'.padEnd(colWidths.day)} │ ${''.padEnd(colWidths.hours)} │\n`;
     content += lastWeekRows.join('\n');
-    content += `\n|${'-'.repeat(colWidths.day + 2)}|${'-'.repeat(colWidths.hours + 2)}|`;
-    content += `\n|${'-'.repeat(colWidths.day + 2)}|${'-'.repeat(colWidths.hours + 2)}|`;
+    content += `\n├${'─'.repeat(colWidths.day + 2)}┼${'─'.repeat(colWidths.hours + 2)}┤`;
     content += '\n' + thisWeekRows.join('\n');
-    content += '\n';
+    content += `\n└${'─'.repeat(colWidths.day + 2)}┴${'─'.repeat(colWidths.hours + 2)}┘\n`;
     return content;
   }
 

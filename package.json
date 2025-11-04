@@ -179,7 +179,8 @@
     "axios": "^1.8.1",
     "commander": "^12.1.0",
     "moment": "^2.30.1",
-    "moment-timezone": "^0.5.48"
+    "moment-timezone": "^0.5.48",
+    "open": "^10.0.3"
   },
   "optionalDependencies": {
     "clipboardy": "^4.0.0"
