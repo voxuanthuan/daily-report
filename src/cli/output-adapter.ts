@@ -1,6 +1,5 @@
 import { IOutputProvider } from '../core/output';
 import * as fs from 'fs';
-import moment from 'moment-timezone';
 
 /**
  * CLI implementation of IOutputProvider
@@ -15,111 +14,6 @@ export class CLIOutputProvider implements IOutputProvider {
   private tokenCount = 0;
   private targetTokenCount = 0;
   private displayTokenCount = 0;
-
-  // Minh Tran ASCII art frames (Wednesday) - Left to Right movement
-  private minhTranFrames = [
-    // Frame 0 - Far left
-    `__  __ _       _       _____
-\\/  (_)_ __ | |__   |_   _| __ __ _ _ __
-|\\/| | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
-|  | | | | | | | | |   | || | | (_| | | | |
-|  |_|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
-    // Frame 1 - Moving right
-    ` __  __ _       _       _____
-|  \\/  (_)_ __ | |__   |_   _| __ __ _ _ __
-| |\\/| | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
-| |  | | | | | | | | |   | || | | (_| | | | |
-|_|  |_|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
-    // Frame 2 - Moving right
-    `  __  __ _       _       _____
- |  \\/  (_)_ __ | |__   |_   _| __ __ _ _ __
- | |\\/| | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
- | |  | | | | | | | | |   | || | | (_| | | | |
- |_|  |_|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
-    // Frame 3 - Moving right
-    `   __  __ _       _       _____
-  |  \\/  (_)_ __ | |__   |_   _| __ __ _ _ __
-  | |\\/| | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
-  | |  | | | | | | | | |   | || | | (_| | | | |
-  |_|  |_|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
-    // Frame 4 - Final position (center-right)
-    `    __  __ _       _       _____
-   |  \\/  (_)_ __ | |__   |_   _| __ __ _ _ __
-   | |\\/| | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
-   | |  | | | | | | | | |   | || | | (_| | | | |
-   |_|  |_|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
-  ];
-
-  // Linh Tran ASCII art frames (Thursday) - Left to Right movement
-  private linhTranFrames = [
-    // Frame 0 - Far left
-    `_     _       _       _____
-|   (_)_ __ | |__   |_   _| __ __ _ _ __
-|   | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
-|___| | | | | | | |   | || | | (_| | | | |
-____|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
-    // Frame 1 - Moving right
-    ` _     _       _       _____
-| |   (_)_ __ | |__   |_   _| __ __ _ _ __
-| |   | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
-| |___| | | | | | | |   | || | | (_| | | | |
-|_____|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
-    // Frame 2 - Moving right
-    `  _     _       _       _____
- | |   (_)_ __ | |__   |_   _| __ __ _ _ __
- | |   | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
- | |___| | | | | | | |   | || | | (_| | | | |
- |_____|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
-    // Frame 3 - Moving right
-    `   _     _       _       _____
-  | |   (_)_ __ | |__   |_   _| __ __ _ _ __
-  | |   | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
-  | |___| | | | | | | |   | || | | (_| | | | |
-  |_____|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
-    // Frame 4 - Final position (center-right)
-    `    _     _       _       _____
-   | |   (_)_ __ | |__   |_   _| __ __ _ _ __
-   | |   | | '_ \\| '_ \\    | || '__/ _\` | '_ \\
-   | |___| | | | | | | |   | || | | (_| | | | |
-   |_____|_|_| |_|_| |_|   |_||_|  \\__,_|_| |_|`,
-  ];
-
-  // Jun ASCII art frames (All other days) - Left to Right movement
-  private junFrames = [
-    // Frame 0 - Far left
-    `    _
-   | |_   _ _ __
-_  | | | | | '_ \\
-|_| | |_| | | | |
-\\__/ \\__,_|_| |_|`,
-    // Frame 1 - Moving right
-    `     _
-    | |_   _ _ __
- _  | | | | | '_ \\
-| |_| | |_| | | | |
- \\___/ \\__,_|_| |_|`,
-    // Frame 2 - Moving right
-    `      _
-     | |_   _ _ __
-  _  | | | | | '_ \\
- | |_| | |_| | | | |
-  \\___/ \\__,_|_| |_|`,
-    // Frame 3 - Moving right
-    `       _
-      | |_   _ _ __
-   _  | | | | | '_ \\
-  | |_| | |_| | | | |
-   \\___/ \\__,_|_| |_|`,
-    // Frame 4 - Final position (center-right)
-    `        _
-       | |_   _ _ __
-    _  | | | | | '_ \\
-   | |_| | |_| | | | |
-    \\___/ \\__,_|_| |_|`,
-  ];
-
-  // Current ASCII text frames (will be set based on day of week)
-  private asciiTextFrames: string[] = [];
 
   // Loading animation dots
   private loadingDots = ['   ', '.  ', '.. ', '...'];
@@ -157,33 +51,13 @@ _  | | | | | '_ \\
     '✷',  // heavy asterisk
   ];
 
-  // Gradient colors for the logo (light orange palette)
-  private logoColors = [
-    '\x1b[38;5;214m', // golden orange
-    '\x1b[38;5;215m', // light golden orange
-    '\x1b[38;5;216m', // peach orange
-    '\x1b[38;5;223m', // light peach
-  ];
-
   constructor(
     private options: {
       format?: 'text' | 'json' | 'markdown';
       silent?: boolean;
       outputFile?: string;
     } = {}
-  ) {
-    // Set ASCII text based on day of week (Australia/Sydney timezone)
-    const dayOfWeek = moment.tz('Australia/Sydney').format('dddd');
-
-    if (dayOfWeek === 'Wednesday') {
-      this.asciiTextFrames = this.minhTranFrames;
-    } else if (dayOfWeek === 'Thursday') {
-      this.asciiTextFrames = this.linhTranFrames;
-    } else {
-      // Monday, Tuesday, Friday, Saturday, Sunday - Show Jun
-      this.asciiTextFrames = this.junFrames;
-    }
-  }
+  ) {}
 
   /**
    * Start a loading spinner with a message
@@ -195,33 +69,20 @@ _  | | | | | '_ \\
 
     this.currentFrame = 0;
     this.startTime = Date.now();
-    let textPosition = 0; // Track text movement position
 
-    // Show ASCII text with animated loading dots and rotation
+    // Show simple spinner with loading dots
     this.spinnerInterval = setInterval(() => {
       const dotsIdx = this.currentFrame % this.loadingDots.length;
       const dots = this.loadingDots[dotsIdx];
       const spinnerIdx = this.currentFrame % this.spinnerFrames.length;
       const spinner = this.spinnerFrames[spinnerIdx];
-      const colorIdx = this.currentFrame % this.logoColors.length;
-      const textColor = this.logoColors[colorIdx];
 
-      // Move text from left to right, then stop at final position
-      // Text moves slower than spinner/color (every 3 frames)
-      if (this.currentFrame % 3 === 0 && textPosition < this.asciiTextFrames.length - 1) {
-        textPosition++;
-      }
-
-      // Use the current text position (stops at final frame)
-      const asciiText = this.asciiTextFrames[textPosition];
-
-      // Clear screen and show ASCII art with loading dots and spinner
-      process.stdout.write('\x1b[2J\x1b[H'); // Clear screen and move cursor to top
-      process.stdout.write(`${textColor}${asciiText}\x1b[0m\n\n`);
-      process.stdout.write(`  ${spinner} ${message}${dots}\n`);
+      // Clear line and show spinner with message
+      process.stdout.write('\r\x1b[K'); // Clear current line
+      process.stdout.write(`${spinner} ${message}${dots}`);
 
       this.currentFrame++;
-    }, 100); // Adjusted timing for smooth rotation
+    }, 100);
   }
 
   /**
@@ -232,8 +93,8 @@ _  | | | | | '_ \\
       clearInterval(this.spinnerInterval);
       this.spinnerInterval = null;
 
-      // Clear the entire screen to remove ASCII art
-      process.stdout.write('\x1b[2J\x1b[H');
+      // Clear the spinner line
+      process.stdout.write('\r\x1b[K');
 
       // Optionally show a subtle completion message
       if (finalMessage) {
