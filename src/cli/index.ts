@@ -220,6 +220,21 @@ program
     }
   });
 
+// TUI command
+program
+  .command('tui')
+  .alias('interactive')
+  .description('Launch interactive TUI (Terminal User Interface)')
+  .action(async () => {
+    try {
+      const { startTUI } = await import('./tui/index.js');
+      await startTUI();
+    } catch (error) {
+      console.error('\x1b[31m✖\x1b[0m Error:', error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
 // Config command
 const configCommand = program
   .command('config')
