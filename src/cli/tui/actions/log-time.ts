@@ -139,13 +139,36 @@ export class LogTimeAction {
         parent: this.screen,
         top: 'center',
         left: 'center',
-        height: 'shrink',
-        width: 'shrink',
+        height: 9,
+        width: '60%',
         keys: true,
         vi: true,
         mouse: true,
         tags: true,
-        border: 'line',
+        border: {
+          type: 'line',
+        },
+        style: {
+          border: {
+            fg: 'cyan',
+          },
+          label: {
+            fg: 'brightcyan',
+            bold: true,
+          },
+          focus: {
+            border: {
+              fg: 'brightcyan',
+            },
+          },
+        },
+        padding: {
+          left: 2,
+          right: 2,
+          top: 1,
+          bottom: 1,
+        },
+        shadow: true,
         hidden: false,
       });
 
@@ -161,7 +184,7 @@ export class LogTimeAction {
         br: '╯',
       };
 
-      prompt.input(message, '', (err, value) => {
+      prompt.input(`{bold}{cyan-fg}${message}{/cyan-fg}{/bold}`, '', (err, value) => {
         this.screen.render();
         resolve(value || '');
       });
@@ -176,13 +199,36 @@ export class LogTimeAction {
         parent: this.screen,
         top: 'center',
         left: 'center',
-        height: 'shrink',
-        width: 'shrink',
+        height: 11,
+        width: '60%',
         keys: true,
         vi: true,
         mouse: true,
         tags: true,
-        border: 'line',
+        border: {
+          type: 'line',
+        },
+        style: {
+          border: {
+            fg: 'green',
+          },
+          label: {
+            fg: 'brightgreen',
+            bold: true,
+          },
+          focus: {
+            border: {
+              fg: 'brightgreen',
+            },
+          },
+        },
+        padding: {
+          left: 2,
+          right: 2,
+          top: 1,
+          bottom: 1,
+        },
+        shadow: true,
       });
 
       // Set rounded border characters
@@ -197,7 +243,9 @@ export class LogTimeAction {
         br: '╯',
       };
 
-      question.ask(message, (err: any, value: any) => {
+      const formattedMessage = `{bold}{white-fg}${message}{/white-fg}{/bold}\n\n{green-fg}[${yes}]{/green-fg} / {red-fg}[${no}]{/red-fg}`;
+
+      question.ask(formattedMessage, (err: any, value: any) => {
         this.screen.render();
         const isYes = value === true || (typeof value === 'string' && value.toLowerCase() === yes.toLowerCase());
         resolve(isYes);

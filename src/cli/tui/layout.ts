@@ -23,8 +23,8 @@ export class Layout {
       todayPanel: { row: 0, col: 0, rowSpan: 4, colSpan: 4 },        // Top 1/3 left
       yesterdayPanel: { row: 4, col: 0, rowSpan: 4, colSpan: 4 },    // Middle 1/3 left
       todoPanel: { row: 8, col: 0, rowSpan: 4, colSpan: 4 },         // Bottom 1/3 left
-      detailsPanel: { row: 0, col: 4, rowSpan: 7, colSpan: 8 },      // Top right (7/12 rows)
-      timelogPanel: { row: 7, col: 4, rowSpan: 5, colSpan: 8 },      // Bottom right (5/12 rows)
+      detailsPanel: { row: 0, col: 4, rowSpan: 9, colSpan: 8 },      // Top right (9/12 rows) - increased for better description viewing
+      timelogPanel: { row: 9, col: 4, rowSpan: 3, colSpan: 8 },      // Bottom right (3/12 rows) - reduced height
       statusBar: { top: '85%', left: 0, width: '100%', height: 3 },  // Moved up slightly
       guideBar: { bottom: 0, left: 0, width: '100%', height: 1 },    // Bottom guide bar
     };
@@ -100,14 +100,12 @@ export class Layout {
     const grey = 'gray-fg';
 
     const shortcuts = [
-      `{${cyan}}Navigate:{/${cyan}} {${white}}Tab{/${white}}`,
-      `{${cyan}}Move:{/${cyan}} {${white}}j/k{/${white}}`,
+      `{${cyan}}Navigate:{/${cyan}} {${white}}hjkl{/${white}}`,
       `{${cyan}}Open:{/${cyan}} {${white}}Enter{/${white}}`,
+      `{${cyan}}LogTime:{/${cyan}} {${white}}i/I{/${white}}`,
+      `{${cyan}}Status:{/${cyan}} {${white}}s{/${white}}`,
       `{${cyan}}CopyTask:{/${cyan}} {${white}}yy{/${white}}`,
       `{${cyan}}CopyReport:{/${cyan}} {${white}}c{/${white}}`,
-      `{${cyan}}Images:{/${cyan}} {${white}}i{/${white}}`,
-      `{${cyan}}LogTime:{/${cyan}} {${white}}l/L{/${white}}`,
-      `{${cyan}}Status:{/${cyan}} {${white}}s{/${white}}`,
       `{${cyan}}Refresh:{/${cyan}} {${white}}r{/${white}}`,
       `{${cyan}}Help:{/${cyan}} {${white}}?{/${white}}`,
       `{${cyan}}Quit:{/${cyan}} {${white}}q{/${white}}`,

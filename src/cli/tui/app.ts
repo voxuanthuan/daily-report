@@ -94,7 +94,16 @@ export class TUIApp {
   }
 
   private setupGlobalKeys(): void {
-    // Tab navigation between panels
+    // Vim-style navigation: h/l for panel left/right
+    this.screen.key(['h'], () => {
+      this.navigateToPreviousPanel();
+    });
+
+    this.screen.key(['l'], () => {
+      this.navigateToNextPanel();
+    });
+
+    // Tab navigation between panels (keep for compatibility)
     this.screen.key(['tab'], () => {
       this.navigateToNextPanel();
     });
@@ -129,12 +138,13 @@ export class TUIApp {
     });
 
     // Note: Enter/o handled by panel widgets directly
+    // Note: j/k handled by panel widgets for item navigation
     // Global handlers for actions that work on selected task
-    this.screen.key(['l'], async () => {
+    this.screen.key(['i'], async () => {
       await this.handleLogTime(false);
     });
 
-    this.screen.key(['L', 'S-l'], async () => {
+    this.screen.key(['I', 'S-i'], async () => {
       await this.handleLogTime(true);
     });
 
@@ -422,35 +432,33 @@ export class TUIApp {
       content: `
 {bold}Jira Daily Report - Interactive TUI{/bold}
 
-{bold}Panel Navigation:{/bold}
-  Tab / Shift-Tab    Navigate between panels
-  1                  Jump to TODAY panel
-  2                  Jump to YESTERDAY panel
-  3                  Jump to TODO panel
-  0                  Jump to DETAILS panel
+{bold}Vim-Style Navigation:{/bold}
+  h / l              Navigate panels (left/right)
+  j / k              Navigate tasks (down/up)
+  Tab / Shift-Tab    Navigate panels (alternative)
+  1 / 2 / 3 / 0      Jump to specific panel
 
-{bold}Task Navigation:{/bold}
-  j / ↓              Move down in task list
-  k / ↑              Move up in task list
-  g / Home           Jump to top of current panel
-  G / End            Jump to bottom of current panel
-  PageUp / PageDown  Scroll by page
+{bold}Panel Shortcuts:{/bold}
+  1                  TODAY panel
+  2                  YESTERDAY panel
+  3                  TODO panel
+  0                  DETAILS panel
 
 {bold}Actions:{/bold}
   Enter / o          Open selected task in browser
-  l                  Log time to selected task (today, no description)
-  L                  Log time with date and description
+  i                  Log time to selected task (today, no description)
+  I (Shift+i)        Log time with date and description
   s                  Change task status
   yy                 Copy task title to clipboard (from focused panel)
   c                  Copy daily standup report (Yesterday/Today/Blockers)
-  i                  Open images in browser (when viewing details)
   r / R              Refresh all data
   q                  Quit application
   ?                  Toggle this help screen
 
 {bold}Layout:{/bold}
   Left Panels        TODAY [1], YESTERDAY [2], TODO [3]
-  Right Panel        DETAILS [0] - Selected task details
+  Right Top          DETAILS [0] - Task details (expanded for better viewing)
+  Right Bottom       TIMELOG - Weekly time summary (compact)
 
 {cyan-fg}Press ? or ESC to close this help screen{/cyan-fg}
       `,
