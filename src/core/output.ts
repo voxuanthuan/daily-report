@@ -49,6 +49,13 @@ export interface IOutputProvider {
    * @param finalMessage Final message to display after stopping
    */
   stopSpinner?(finalMessage?: string): void;
+
+  /**
+   * Update progress information during generation (optional)
+   * @param tasks Number of tasks fetched
+   * @param worklogs Number of worklogs processed
+   */
+  updateProgress?(tasks?: number, worklogs?: number): void;
 }
 
 /**
@@ -126,6 +133,15 @@ export class OutputManager {
   stopSpinner(finalMessage?: string): void {
     if (this.provider.stopSpinner) {
       this.provider.stopSpinner(finalMessage);
+    }
+  }
+
+  /**
+   * Update progress information
+   */
+  updateProgress(tasks?: number, worklogs?: number): void {
+    if (this.provider.updateProgress) {
+      this.provider.updateProgress(tasks, worklogs);
     }
   }
 }

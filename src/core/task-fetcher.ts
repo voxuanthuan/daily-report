@@ -111,7 +111,7 @@ async function fetchBacklogTasks(configManager: ConfigManager): Promise<{ inProg
     const isQC = whoAmI === IAM.QC;
 
     const jql = `assignee = '${jiraUsername}' AND status IN ('Selected for Development', 'Open', 'In Progress')`;
-    const fields = ['summary', 'subtasks', 'status', 'priority', 'issuetype'].concat(isQC ? ['parent'] : []).join(',');
+    const fields = ['summary', 'subtasks', 'status', 'priority', 'issuetype', 'assignee', 'description'].concat(isQC ? ['parent'] : []).join(',');
     const url = `${jiraServer}rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&maxResults=100`;
 
     try {
@@ -179,7 +179,6 @@ async function fetchJiraIssueDetails(issueKey: string, configManager: ConfigMana
   // Extract previous workday tasks from existing worklog data (no additional API calls)
   export async function extractPreviousWorkdayTasks(allWorklogs: any[], workerId: string, configManager: ConfigManager): Promise<PreviousWorkdayResult> {
     if (allWorklogs.length === 0) {
-      console.log('No worklogs provided for extraction');
       return { tasks: [], actualDate: null };
     }
 
@@ -213,14 +212,12 @@ async function fetchJiraIssueDetails(issueKey: string, configManager: ConfigMana
         );
         const issueDetails = (await Promise.all(issueDetailsPromises)).filter((issue): issue is JiraIssue => issue !== null);
 
-        console.log(`Extracted ${issueDetails.length} tasks from existing data for: ${currentDateStr}`);
         return { tasks: issueDetails, actualDate: currentDateStr };
       }
 
       currentDay.subtract(1, 'day');
     }
 
-    console.log('No worklogs found on working days in existing data');
     return { tasks: [], actualDate: null };
   }
   
