@@ -19,9 +19,15 @@ interface JiraIssue {
     };
   }
 
+  export interface TaskWithWorklogs {
+    task: JiraIssue;
+    worklogs: Array<{ description?: string; timeSpentSeconds: number }>;
+  }
+
   export interface PreviousWorkdayResult {
     tasks: JiraIssue[];
     actualDate: string | null;
+    tasksWithWorklogs?: TaskWithWorklogs[];
   }
 
 export async function fetchAllTasks(configManager: ConfigManager): Promise<{ inProgress: any[]; open: any[] }> {
@@ -179,7 +185,7 @@ async function fetchJiraIssueDetails(issueKey: string, configManager: ConfigMana
   // Extract previous workday tasks from existing worklog data (no additional API calls)
   export async function extractPreviousWorkdayTasks(allWorklogs: any[], workerId: string, configManager: ConfigManager): Promise<PreviousWorkdayResult> {
     if (allWorklogs.length === 0) {
-      return { tasks: [], actualDate: null };
+      return { tasks: [], actualDate: null, tasksWithWorklogs: [] };
     }
 
     // Group worklogs by date
@@ -206,19 +212,46 @@ async function fetchJiraIssueDetails(issueKey: string, configManager: ConfigMana
       const dayWorklogs = worklogsByDate[currentDateStr];
 
       if (dayWorklogs && dayWorklogs.length > 0) {
-        // Fetch Jira issue details for each worklog in parallel
-        const issueDetailsPromises = dayWorklogs.map(worklog =>
-          fetchJiraIssueDetails(worklog.issue.id, configManager)
+        // Group worklogs by issue ID
+        const worklogsByIssue: { [key: string]: typeof dayWorklogs } = {};
+        dayWorklogs.forEach(worklog => {
+          const issueId = worklog.issue.id;
+          if (!worklogsByIssue[issueId]) {
+            worklogsByIssue[issueId] = [];
+          }
+          worklogsByIssue[issueId].push(worklog);
+        });
+
+        // Fetch Jira issue details for unique issues
+        const uniqueIssueIds = Object.keys(worklogsByIssue);
+        const issueDetailsPromises = uniqueIssueIds.map(issueId =>
+          fetchJiraIssueDetails(issueId, configManager)
         );
         const issueDetails = (await Promise.all(issueDetailsPromises)).filter((issue): issue is JiraIssue => issue !== null);
 
-        return { tasks: issueDetails, actualDate: currentDateStr };
+        // Create TaskWithWorklogs objects
+        const tasksWithWorklogs: TaskWithWorklogs[] = issueDetails.map(issue => {
+          const issueWorklogs = worklogsByIssue[issue.id] || [];
+          return {
+            task: issue,
+            worklogs: issueWorklogs.map(wl => ({
+              description: wl.description,
+              timeSpentSeconds: wl.timeSpentSeconds
+            }))
+          };
+        });
+
+        return {
+          tasks: issueDetails,
+          actualDate: currentDateStr,
+          tasksWithWorklogs: tasksWithWorklogs
+        };
       }
 
       currentDay.subtract(1, 'day');
     }
 
-    return { tasks: [], actualDate: null };
+    return { tasks: [], actualDate: null, tasksWithWorklogs: [] };
   }
   
   // Cache for previous workday tasks
@@ -251,7 +284,7 @@ async function fetchJiraIssueDetails(issueKey: string, configManager: ConfigMana
 
       if (allWorklogs.length === 0) {
         console.log('No worklogs found in the last 14 days');
-        const result = { tasks: [], actualDate: null };
+        const result = { tasks: [], actualDate: null, tasksWithWorklogs: [] };
         previousWorkdayCache = { data: result, timestamp: Date.now() };
         return result;
       }
@@ -278,14 +311,41 @@ async function fetchJiraIssueDetails(issueKey: string, configManager: ConfigMana
         const dayWorklogs = worklogsByDate[currentDateStr];
 
         if (dayWorklogs && dayWorklogs.length > 0) {
-          // Fetch Jira issue details for each worklog in parallel
-          const issueDetailsPromises = dayWorklogs.map(worklog =>
-            fetchJiraIssueDetails(worklog.issue.id, configManager)
+          // Group worklogs by issue ID
+          const worklogsByIssue: { [key: string]: typeof dayWorklogs } = {};
+          dayWorklogs.forEach(worklog => {
+            const issueId = worklog.issue.id;
+            if (!worklogsByIssue[issueId]) {
+              worklogsByIssue[issueId] = [];
+            }
+            worklogsByIssue[issueId].push(worklog);
+          });
+
+          // Fetch Jira issue details for unique issues
+          const uniqueIssueIds = Object.keys(worklogsByIssue);
+          const issueDetailsPromises = uniqueIssueIds.map(issueId =>
+            fetchJiraIssueDetails(issueId, configManager)
           );
           const issueDetails = (await Promise.all(issueDetailsPromises)).filter((issue): issue is JiraIssue => issue !== null);
 
+          // Create TaskWithWorklogs objects
+          const tasksWithWorklogs: TaskWithWorklogs[] = issueDetails.map(issue => {
+            const issueWorklogs = worklogsByIssue[issue.id] || [];
+            return {
+              task: issue,
+              worklogs: issueWorklogs.map(wl => ({
+                description: wl.description,
+                timeSpentSeconds: wl.timeSpentSeconds
+              }))
+            };
+          });
+
           console.log(`Found ${issueDetails.length} tasks for most recent workday: ${currentDateStr}`);
-          const result = { tasks: issueDetails, actualDate: currentDateStr };
+          const result = {
+            tasks: issueDetails,
+            actualDate: currentDateStr,
+            tasksWithWorklogs: tasksWithWorklogs
+          };
           previousWorkdayCache = { data: result, timestamp: Date.now() };
           return result;
         }
@@ -294,13 +354,13 @@ async function fetchJiraIssueDetails(issueKey: string, configManager: ConfigMana
       }
 
       console.log('No worklogs found on working days in the last 14 days');
-      const result = { tasks: [], actualDate: null };
+      const result = { tasks: [], actualDate: null, tasksWithWorklogs: [] };
       previousWorkdayCache = { data: result, timestamp: Date.now() };
       return result;
 
     } catch (error: any) {
       console.error(`Failed to fetch worklogs for date range: ${error.message}`);
-      return { tasks: [], actualDate: null };
+      return { tasks: [], actualDate: null, tasksWithWorklogs: [] };
     }
   }
 

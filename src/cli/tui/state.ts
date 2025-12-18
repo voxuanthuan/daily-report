@@ -30,6 +30,11 @@ interface UserInfo {
   emailAddress: string;
 }
 
+export interface TaskWithWorklogs {
+  task: JiraIssue;
+  worklogs: Array<{ description?: string; timeSpentSeconds: number }>;
+}
+
 export interface PanelState {
   selectedIndex: number;
   scrollOffset: number;
@@ -51,6 +56,7 @@ export interface TUIState {
     open: JiraIssue[];
     yesterday: JiraIssue[];
   };
+  tasksWithWorklogs: TaskWithWorklogs[];
   worklogs: Worklog[];
   user: UserInfo | null;
   loading: boolean;
@@ -78,6 +84,7 @@ export class StateManager {
         open: [],
         yesterday: [],
       },
+      tasksWithWorklogs: [],
       worklogs: [],
       user: null,
       loading: false,
@@ -124,6 +131,11 @@ export class StateManager {
 
   updateYesterdayTasks(tasks: JiraIssue[]): void {
     this.state.tasks.yesterday = tasks;
+    this.notify();
+  }
+
+  updateTasksWithWorklogs(tasksWithWorklogs: TaskWithWorklogs[]): void {
+    this.state.tasksWithWorklogs = tasksWithWorklogs;
     this.notify();
   }
 

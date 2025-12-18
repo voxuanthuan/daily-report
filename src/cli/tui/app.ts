@@ -165,6 +165,11 @@ export class TUIApp {
       }
     });
 
+    // Shift+Y to copy ticket ID
+    this.screen.key(['Y', 'S-y'], () => {
+      this.handleCopyTicketId();
+    });
+
     // 'c' to copy daily standup report
     this.screen.key(['c'], async () => {
       await this.handleCopyReport();
@@ -231,6 +236,9 @@ export class TUIApp {
         this.configManager
       );
       this.state.updateYesterdayTasks(yesterdayResult.tasks);
+      if (yesterdayResult.tasksWithWorklogs) {
+        this.state.updateTasksWithWorklogs(yesterdayResult.tasksWithWorklogs);
+      }
 
       this.state.setLoading(false);
       this.state.setLastRefresh(new Date());
@@ -334,6 +342,21 @@ export class TUIApp {
     this.panels.status.setMessage(`Copied: "${truncatedTitle}"`, 'success');
   }
 
+  private handleCopyTicketId(): void {
+    const task = this.state.getCurrentTask();
+    if (!task) {
+      this.panels.status.setMessage('No task selected', 'warning');
+      return;
+    }
+
+    const ticketId = task.key || task.id;
+    this.copyToClipboard(ticketId).then(() => {
+      this.panels.status.setMessage(`Copied ticket ID: ${ticketId}`, 'success');
+    }).catch(() => {
+      // Error already handled in copyToClipboard
+    });
+  }
+
   private async copyToClipboard(text: string): Promise<void> {
     try {
       const clipboardModule = await import('clipboardy');
@@ -359,25 +382,40 @@ export class TUIApp {
 
     // Yesterday section
     lines.push('Yesterday');
-    if (state.tasks.yesterday.length === 0) {
-      lines.push('• No tasks');
-    } else {
+    if (state.tasksWithWorklogs.length > 0) {
+      // Use tasksWithWorklogs to show descriptions as sub-items
+      state.tasksWithWorklogs.forEach(({ task, worklogs }) => {
+        const key = task.key || task.id;
+        const summary = task.fields.summary;
+        lines.push(`  - ${key}: ${summary}`);
+
+        // Add worklog descriptions as sub-items with deeper indentation
+        worklogs.forEach(worklog => {
+          if (worklog.description && worklog.description.trim()) {
+            lines.push(`    - ${worklog.description}`);
+          }
+        });
+      });
+    } else if (state.tasks.yesterday.length > 0) {
+      // Fallback to old format if tasksWithWorklogs is not available
       state.tasks.yesterday.forEach(task => {
         const key = task.key || task.id;
         const summary = task.fields.summary;
-        lines.push(`• ${key}: ${summary}`);
+        lines.push(`  - ${key}: ${summary}`);
       });
+    } else {
+      lines.push('  - No tasks');
     }
 
     // Today section
     lines.push('Today');
     if (state.tasks.inProgress.length === 0) {
-      lines.push('• No tasks');
+      lines.push('  - No tasks');
     } else {
       state.tasks.inProgress.forEach(task => {
         const key = task.key || task.id;
         const summary = task.fields.summary;
-        lines.push(`• ${key}: ${summary}`);
+        lines.push(`  - ${key}: ${summary}`);
       });
     }
 
@@ -450,6 +488,7 @@ export class TUIApp {
   I (Shift+i)        Log time with date and description
   s                  Change task status
   yy                 Copy task title to clipboard (from focused panel)
+  Y (Shift+y)        Copy ticket ID to clipboard (e.g., GRAP-12345)
   c                  Copy daily standup report (Yesterday/Today/Blockers)
   r / R              Refresh all data
   q                  Quit application

@@ -131,7 +131,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Initialize cache manager
     CacheManager.registerClearCacheCommand(context);
-    
+
     // Register all commands
     context.subscriptions.push(
         vscode.commands.registerCommand('jiraDailyReport.generate', async () => {
