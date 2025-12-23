@@ -13,6 +13,8 @@ import { LogTimeAction } from './actions/log-time';
 import { ChangeStatusAction } from './actions/change-status';
 import { fetchAllTasks, fetchUserDisplayName, extractPreviousWorkdayTasks, clearCaches } from '../../core/task-fetcher';
 import TempoFetcher from '../../core/tempo/fetcher';
+import { CacheManager, RequestDeduplicator, debounce } from './utils/cache';
+import { getTheme } from './theme';
 
 export class TUIApp {
   private screen: blessed.Widgets.Screen;
@@ -36,12 +38,25 @@ export class TUIApp {
   private panelOrder: PanelType[] = ['today', 'yesterday', 'todo', 'details'];  // Navigable panels
   private helpOverlay: blessed.Widgets.BoxElement | null = null;
   private lastYKeyTime: number = 0;
+  
+  // Performance optimization
+  private cacheManager: CacheManager;
+  private requestDeduplicator: RequestDeduplicator;
+  private debouncedRender: () => void;
+  private loadingIndicator: NodeJS.Timeout | null = null;
 
   constructor(screen: blessed.Widgets.Screen, configManager: ConfigManager) {
     this.screen = screen;
     this.configManager = configManager;
     this.state = new StateManager();
     this.layout = new Layout(screen);
+    
+    // Initialize performance optimizations
+    this.cacheManager = new CacheManager(300000); // 5 minute cache
+    this.requestDeduplicator = new RequestDeduplicator();
+    this.debouncedRender = debounce(() => {
+      this.screen.render();
+    }, 16); // ~60fps
 
     const grid = this.layout.getGrid();
 
@@ -70,10 +85,7 @@ export class TUIApp {
         this.layout.positions.detailsPanel,
         this.configManager
       ),
-      status: new StatusPanel(
-        this.layout.createStatusBar(),
-        this.state
-      ),
+      status: new StatusPanel(this.state),
       timelog: new TimeLogPanel(
         grid,
         this.state,
@@ -91,6 +103,7 @@ export class TUIApp {
     };
 
     this.setupGlobalKeys();
+    this.setupRenderOptimization();
   }
 
   private setupGlobalKeys(): void {
@@ -174,6 +187,52 @@ export class TUIApp {
     this.screen.key(['c'], async () => {
       await this.handleCopyReport();
     });
+
+    // 'v' to view images (works from any panel if task has images)
+    this.screen.key(['v'], async () => {
+      const task = this.state.getCurrentTask();
+      
+      if (task) {
+        await this.panels.details.viewImages();
+      }
+    });
+
+    // 'a' to show actions menu
+    this.screen.key(['a'], () => {
+      this.showActionsMenu();
+    });
+  }
+  
+  /**
+   * Setup render optimization with debouncing
+   */
+  private setupRenderOptimization(): void {
+    // Subscribe to state changes with debounced rendering
+    this.state.subscribe((state, changedKeys) => {
+      // Only re-render panels that actually changed
+      if (changedKeys) {
+        changedKeys.forEach(key => {
+          if (key === 'focusedPanel' || key === '*') {
+            this.renderAllPanels();
+          } else if (key.startsWith('panels.today')) {
+            this.panels.today.render();
+          } else if (key.startsWith('panels.yesterday')) {
+            this.panels.yesterday.render();
+          } else if (key.startsWith('panels.todo')) {
+            this.panels.todo.render();
+          } else if (key.startsWith('panels.details')) {
+            this.panels.details.render();
+          } else if (key === 'tasks' || key === 'worklogs' || key === 'tasksWithWorklogs') {
+            this.renderAllPanels();
+          } else if (key === 'statusMessage' || key === 'loading') {
+            this.panels.status.render();
+          }
+        });
+      }
+      
+      // Use debounced render
+      this.debouncedRender();
+    });
   }
 
   private navigateToNextPanel(): void {
@@ -206,14 +265,26 @@ export class TUIApp {
   }
 
   private async loadInitialData(): Promise<void> {
+    this.showLoadingIndicator('Loading data...');
     this.state.setLoading(true);
     this.state.setStatusMessage('Loading data...');
 
     try {
-      const [tasks, user] = await Promise.all([
-        fetchAllTasks(this.configManager),
-        fetchUserDisplayName(this.configManager),
-      ]);
+      // Use cache for tasks if available
+      let tasks = this.cacheManager.get<any>('tasks');
+      let user = this.cacheManager.get<any>('user');
+      
+      // Deduplicate concurrent requests
+      const taskPromise = tasks ? Promise.resolve(tasks) : 
+        this.requestDeduplicator.execute('fetchTasks', () => fetchAllTasks(this.configManager));
+      const userPromise = user ? Promise.resolve(user) : 
+        this.requestDeduplicator.execute('fetchUser', () => fetchUserDisplayName(this.configManager));
+      
+      [tasks, user] = await Promise.all([taskPromise, userPromise]);
+      
+      // Cache the results
+      this.cacheManager.set('tasks', tasks, 180000); // 3 minutes
+      this.cacheManager.set('user', user, 600000); // 10 minutes
 
       this.state.updateUser(user);
       this.state.updateTasks(tasks);
@@ -224,12 +295,22 @@ export class TUIApp {
         user.accountId
       );
 
+      this.updateLoadingIndicator('Fetching worklogs...');
       const tempoApiToken = await this.configManager.getTempoApiToken();
       const fetcher = new TempoFetcher(user.accountId, tempoApiToken);
-      const worklogs = await fetcher.fetchLastSixDaysWorklogs();
+      
+      // Use cache for worklogs
+      let worklogs = this.cacheManager.get<any>('worklogs');
+      if (!worklogs) {
+        worklogs = await this.requestDeduplicator.execute('fetchWorklogs', () => 
+          fetcher.fetchLastSixDaysWorklogs()
+        );
+        this.cacheManager.set('worklogs', worklogs, 120000); // 2 minutes
+      }
 
       this.state.updateWorklogs(worklogs);
 
+      this.updateLoadingIndicator('Processing tasks...');
       const yesterdayResult = await extractPreviousWorkdayTasks(
         worklogs,
         user.accountId,
@@ -240,10 +321,16 @@ export class TUIApp {
         this.state.updateTasksWithWorklogs(yesterdayResult.tasksWithWorklogs);
       }
 
+      this.hideLoadingIndicator();
       this.state.setLoading(false);
       this.state.setLastRefresh(new Date());
+      
+      // Update status bar with statistics
+      this.panels.status.updateStats(tasks, worklogs);
+      
       this.state.setStatusMessage('Ready');
     } catch (error) {
+      this.hideLoadingIndicator();
       this.state.setLoading(false);
       throw error;
     }
@@ -261,6 +348,8 @@ export class TUIApp {
   async refresh(): Promise<void> {
     this.panels.status.setMessage('Refreshing data...', 'info');
     try {
+      // Clear both app cache and core caches
+      this.cacheManager.clear();
       clearCaches();
       await this.loadInitialData();
       this.renderAllPanels();
@@ -270,6 +359,41 @@ export class TUIApp {
         `Refresh failed: ${error instanceof Error ? error.message : String(error)}`,
         'error'
       );
+    }
+  }
+  
+  /**
+   * Show loading indicator
+   */
+  private showLoadingIndicator(message: string): void {
+    this.panels.status.setMessage(`⏳ ${message}`, 'info');
+    // Optional: Add animated loading indicator
+    const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    let frame = 0;
+    
+    this.loadingIndicator = setInterval(() => {
+      this.panels.status.setMessage(`${frames[frame]} ${message}`, 'info');
+      frame = (frame + 1) % frames.length;
+    }, 80);
+  }
+  
+  /**
+   * Update loading indicator message
+   */
+  private updateLoadingIndicator(message: string): void {
+    if (this.loadingIndicator) {
+      this.hideLoadingIndicator();
+      this.showLoadingIndicator(message);
+    }
+  }
+  
+  /**
+   * Hide loading indicator
+   */
+  private hideLoadingIndicator(): void {
+    if (this.loadingIndicator) {
+      clearInterval(this.loadingIndicator);
+      this.loadingIndicator = null;
     }
   }
 
@@ -442,6 +566,81 @@ export class TUIApp {
     }
   }
 
+  private showActionsMenu(): void {
+    const task = this.state.getCurrentTask();
+    if (!task) {
+      this.panels.status.setMessage('No task selected', 'warning');
+      return;
+    }
+
+    const theme = getTheme();
+    const key = task.key || task.id;
+    const actionsMenu = blessed.list({
+      parent: this.screen,
+      top: 'center',
+      left: 'center',
+      width: 50,
+      height: 14,
+      label: ` Actions for ${key} `,
+      tags: true,
+      border: 'line',
+      style: {
+        border: { fg: theme.primary },  // Use primary color (Crail)
+        selected: { bg: theme.primary, fg: 'white' }  // Use primary color (Crail)
+      },
+      keys: true,
+      vi: true,
+      items: [
+        '{cyan-fg}o{/cyan-fg}  Open in browser',
+        '{cyan-fg}i{/cyan-fg}  Log time (today)',
+        '{cyan-fg}I{/cyan-fg}  Log time (with date & description)',
+        '{cyan-fg}s{/cyan-fg}  Change status',
+        '{cyan-fg}yy{/cyan-fg} Copy task title',
+        '{cyan-fg}Y{/cyan-fg}  Copy ticket ID',
+        '{cyan-fg}c{/cyan-fg}  Copy daily report',
+        '{cyan-fg}v{/cyan-fg}  View images',
+        '{cyan-fg}r{/cyan-fg}  Refresh data',
+      ]
+    });
+
+    // Set rounded borders
+    (actionsMenu as any).border.ch = {
+      top: '─',
+      bottom: '─',
+      left: '│',
+      right: '│',
+      tl: '╭',
+      tr: '╮',
+      bl: '╰',
+      br: '╯',
+    };
+
+    actionsMenu.on('select', async (item, index) => {
+      actionsMenu.detach();
+      this.screen.render();
+      
+      switch(index) {
+        case 0: await this.handleOpenUrl(); break;
+        case 1: await this.handleLogTime(false); break;
+        case 2: await this.handleLogTime(true); break;
+        case 3: await this.handleChangeStatus(); break;
+        case 4: await this.handleCopyTitle(); break;
+        case 5: this.handleCopyTicketId(); break;
+        case 6: await this.handleCopyReport(); break;
+        case 7: await this.panels.details.viewImages(); break;
+        case 8: await this.refresh(); break;
+      }
+    });
+
+    actionsMenu.key(['escape', 'q'], () => {
+      actionsMenu.detach();
+      this.screen.render();
+    });
+
+    actionsMenu.focus();
+    this.screen.render();
+  }
+
   private toggleHelp(): void {
     if (this.helpOverlay) {
       this.helpOverlay.detach();
@@ -450,6 +649,7 @@ export class TUIApp {
       return;
     }
 
+    const theme = getTheme();
     this.helpOverlay = blessed.box({
       parent: this.screen,
       top: 'center',
@@ -464,7 +664,7 @@ export class TUIApp {
       vi: true,
       style: {
         border: {
-          fg: 'cyan',
+          fg: theme.primary,  // Use primary color (Crail)
         },
       },
       content: `
@@ -524,6 +724,7 @@ export class TUIApp {
   }
 
   cleanup(): void {
+    this.hideLoadingIndicator();
     this.screen.destroy();
   }
 }

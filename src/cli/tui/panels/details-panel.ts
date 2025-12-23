@@ -39,7 +39,7 @@ export class DetailsPanel {
       position.colSpan,
       blessed.box,
       {
-        label: '[0] Details',
+        label: '(0) Details',
         tags: true,
         scrollable: true,
         alwaysScroll: true,
@@ -76,6 +76,56 @@ export class DetailsPanel {
 
     this.setupKeyHandlers();
     this.subscribe();
+  }
+
+  /**
+   * Public method to view images - called when user presses 'v'
+   */
+  async viewImages(): Promise<void> {
+    const task = this.state.getCurrentTask();
+    
+    if (!task) {
+      return;
+    }
+
+    const attachments = task.fields?.attachment || [];
+    const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'];
+    const imageAttachments = attachments.filter((att: any) => {
+      const filename = (att.filename || '').toLowerCase();
+      return imageExtensions.some(ext => filename.endsWith(ext));
+    });
+
+    if (imageAttachments.length === 0) {
+      this.state.setStatusMessage('{yellow-fg}No image attachments found{/yellow-fg}');
+      return;
+    }
+
+    try {
+      this.state.setStatusMessage('{cyan-fg}Downloading images...{/cyan-fg}');
+      
+      const { AttachmentDownloader } = await import('../attachment-downloader.js');
+      const downloader = new AttachmentDownloader(this.configManager);
+      
+      // Download all images
+      const downloadedPaths = await downloader.downloadImages(task);
+      
+      if (downloadedPaths.length > 0) {
+        this.state.setStatusMessage(`{green-fg}Opening ${downloadedPaths.length} image(s)...{/green-fg}`);
+        
+        // Open images with system default viewer
+        const open = (await import('open')).default;
+        for (const imagePath of downloadedPaths) {
+          await open(imagePath);
+        }
+        
+        // Show success message with location
+        setTimeout(() => {
+          this.state.setStatusMessage(`{green-fg}✓ Opened ${downloadedPaths.length} image(s) (saved to ~/Downloads/jira-attachments){/green-fg}`);
+        }, 500);
+      }
+    } catch (error: any) {
+      this.state.setStatusMessage(`{red-fg}Error: ${error.message}{/red-fg}`);
+    }
   }
 
   private setupKeyHandlers(): void {

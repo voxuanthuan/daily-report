@@ -4,6 +4,7 @@ import { ConfigManager } from '../../../core/config';
 import TempoWorklogCreator from '../../../core/tempo/worklog-creator';
 import TimesheetParser from '../../../core/tempo/timesheet-parser';
 import { ActionResult } from './open-url';
+import { getTheme } from '../theme';
 
 export class LogTimeAction {
   constructor(
@@ -135,6 +136,8 @@ export class LogTimeAction {
 
   private showPrompt(message: string): Promise<string> {
     return new Promise((resolve) => {
+      const theme = getTheme();
+      
       const prompt = blessed.prompt({
         parent: this.screen,
         top: 'center',
@@ -150,15 +153,15 @@ export class LogTimeAction {
         },
         style: {
           border: {
-            fg: 'cyan',
+            fg: theme.primary,  // Use primary color (Crail)
           },
           label: {
-            fg: 'brightcyan',
+            fg: theme.primary,  // Use primary color (Crail)
             bold: true,
           },
           focus: {
             border: {
-              fg: 'brightcyan',
+              fg: theme.primary,  // Use primary color (Crail)
             },
           },
         },
@@ -184,7 +187,7 @@ export class LogTimeAction {
         br: '╯',
       };
 
-      prompt.input(`{bold}{cyan-fg}${message}{/cyan-fg}{/bold}`, '', (err, value) => {
+      prompt.input(`{bold}${message}{/bold}`, '', (err, value) => {
         this.screen.render();
         resolve(value || '');
       });
@@ -195,6 +198,8 @@ export class LogTimeAction {
 
   private showConfirmation(message: string, yes: string, no: string): Promise<boolean> {
     return new Promise((resolve) => {
+      const theme = getTheme();
+      
       const question = blessed.question({
         parent: this.screen,
         top: 'center',
@@ -210,15 +215,15 @@ export class LogTimeAction {
         },
         style: {
           border: {
-            fg: 'green',
+            fg: theme.primary,  // Use primary color (Crail)
           },
           label: {
-            fg: 'brightgreen',
+            fg: theme.primary,  // Use primary color (Crail)
             bold: true,
           },
           focus: {
             border: {
-              fg: 'brightgreen',
+              fg: theme.primary,  // Use primary color (Crail)
             },
           },
         },

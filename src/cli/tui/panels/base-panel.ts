@@ -1,6 +1,6 @@
 import blessed from 'blessed';
 import { StateManager, PanelType } from '../state';
-import { getListStyle } from '../theme';
+import { getListStyle, getTheme } from '../theme';
 
 export abstract class BasePanel {
   protected widget: blessed.Widgets.ListElement;
@@ -17,6 +17,8 @@ export abstract class BasePanel {
   ) {
     this.state = state;
     this.panelType = panelType;
+
+    const theme = getTheme();
 
     this.widget = grid.set(
       position.row,
@@ -36,7 +38,7 @@ export abstract class BasePanel {
         scrollbar: {
           ch: '█',
           style: {
-            fg: 'blue',
+            fg: theme.primary,  // Use primary color for scrollbar
           },
         },
         style: getListStyle(false),
@@ -98,9 +100,40 @@ export abstract class BasePanel {
       this.state.setSelectedIndex(this.panelType, newIndex);
     });
 
+    // Ctrl+b for page up (vim-style)
+    this.widget.key(['C-b'], () => {
+      const current = this.state.getState().panels[this.panelType].selectedIndex;
+      const newIndex = Math.max(0, current - 10);
+      this.state.setSelectedIndex(this.panelType, newIndex);
+    });
+
+    // Ctrl+f for page down (vim-style)
+    this.widget.key(['C-f'], () => {
+      const current = this.state.getState().panels[this.panelType].selectedIndex;
+      const items = this.state.getState().panels[this.panelType].items;
+      const newIndex = Math.min(items.length - 1, current + 10);
+      this.state.setSelectedIndex(this.panelType, newIndex);
+    });
+
     this.widget.key(['enter', 'o'], () => {
       this.onSelect();
     });
+  }
+
+  /**
+   * Update panel label with position indicator (e.g., "TODAY (2/5)")
+   */
+  protected updateLabelWithPosition(baseLabel: string): void {
+    const items = this.state.getState().panels[this.panelType].items;
+    const selectedIndex = this.state.getState().panels[this.panelType].selectedIndex;
+    
+    if (items.length > 0) {
+      const current = selectedIndex + 1;
+      const total = items.length;
+      this.widget.setLabel(` ${baseLabel} (${current}/${total}) `);
+    } else {
+      this.widget.setLabel(` ${baseLabel} `);
+    }
   }
 
   protected subscribe(): void {

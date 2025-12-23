@@ -2,6 +2,7 @@ import blessed from 'blessed';
 import axios from 'axios';
 import { ConfigManager } from '../../../core/config';
 import { ActionResult } from './open-url';
+import { getTheme } from '../theme';
 
 interface JiraTransition {
   id: string;
@@ -116,6 +117,8 @@ export class ChangeStatusAction {
 
   private showTransitionList(transitions: JiraTransition[], currentStatus?: string): Promise<JiraTransition | null> {
     return new Promise((resolve) => {
+      const theme = getTheme();
+      
       // Find current status index to pre-select it
       let initialIndex = 0;
       if (currentStatus) {
@@ -130,7 +133,7 @@ export class ChangeStatusAction {
       const items = transitions.map(t => {
         // Mark current status with indicator
         if (currentStatus && t.name.toLowerCase() === currentStatus.toLowerCase()) {
-          return `${t.name} {cyan-fg}(current){/cyan-fg}`;
+          return `${t.name} {gray-fg}(current){/gray-fg}`;
         }
         return t.name;
       });
@@ -151,8 +154,8 @@ export class ChangeStatusAction {
         items: items,
         style: {
           selected: {
-            bg: '#3e4451',  // Deep indigo - same as task list
-            fg: '#ffffff',   // White text
+            bg: theme.primary,  // Use primary color (Crail) for selected item
+            fg: '#ffffff',       // White text
             bold: true,
           },
           item: {
@@ -160,7 +163,7 @@ export class ChangeStatusAction {
             bg: 'black',
           },
           border: {
-            fg: 'cyan',
+            fg: theme.primary,  // Use primary color (Crail) for border
           },
         },
       });

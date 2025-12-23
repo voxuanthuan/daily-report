@@ -23,7 +23,7 @@ export class TodoPanel extends BasePanel {
     position: { row: number; col: number; rowSpan: number; colSpan: number },
     onSelectCallback?: (task: any) => Promise<void>
   ) {
-    super(grid, state, 'todo', position, '[3] Todo');
+    super(grid, state, 'todo', position, '(3) Todo');
     this.onSelectCallback = onSelectCallback;
   }
 
@@ -35,18 +35,15 @@ export class TodoPanel extends BasePanel {
     if (tasks.length === 0) {
       items.push('{gray-fg}No tasks{/gray-fg}');
     } else {
-      tasks.forEach(task => {
+      const selectedIndex = this.state.getState().panels.todo.selectedIndex;
+      
+      tasks.forEach((task, index) => {
         const issueType = task.fields?.issuetype?.name || 'Task';
         const key = task.key || task.id;
         const summary = task.fields.summary;
 
-        // Truncate summary to fit panel width
-        const maxWidth = 35;
-        const truncatedSummary = summary.length > maxWidth
-          ? summary.substring(0, maxWidth - 3) + '...'
-          : summary;
-
-        items.push(`${getIssueIcon(issueType)} ${key}: ${truncatedSummary}`);
+        // Show full text for all items
+        items.push(`${getIssueIcon(issueType)} ${key}: ${summary}`);
       });
     }
 
@@ -64,6 +61,9 @@ export class TodoPanel extends BasePanel {
       }
       this.widget.select(validIndex);
     }
+
+    // Update label with position indicator
+    this.updateLabelWithPosition('(3) Todo');
 
     this.widget.screen.render();
   }

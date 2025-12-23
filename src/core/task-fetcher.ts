@@ -114,11 +114,9 @@ async function fetchBacklogTasks(configManager: ConfigManager): Promise<{ inProg
         'Content-Type': 'application/json'
     };
     const whoAmI = await configManager.getWhoAmI();
-    const isQC = whoAmI === IAM.QC;
-
-    const jql = `assignee = '${jiraUsername}' AND status IN ('Selected for Development', 'Open', 'In Progress')`;
-    const fields = ['summary', 'subtasks', 'status', 'priority', 'issuetype', 'assignee', 'description'].concat(isQC ? ['parent'] : []).join(',');
-    const url = `${jiraServer}rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&maxResults=100`;
+    const isQC = whoAmI === IAM.QC;  const jql = `assignee = '${jiraUsername}' AND status IN ('Selected for Development', 'Open', 'In Progress')`;
+    const fields = ['summary', 'subtasks', 'status', 'priority', 'issuetype', 'assignee', 'description', 'comment', 'attachment'].concat(isQC ? ['parent'] : []).join(',');
+    const url = `${jiraServer}rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&expand=changelog&maxResults=100`;
 
     try {
         const response = await axios.get(url, { headers: apiHeaders });

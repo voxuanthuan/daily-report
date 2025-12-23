@@ -1,5 +1,6 @@
 import blessed from 'blessed';
 import { StateManager } from '../state';
+import { getTheme } from '../theme';
 import moment from 'moment-timezone';
 
 export class TimeLogPanel {
@@ -12,6 +13,7 @@ export class TimeLogPanel {
     position: { row: number; col: number; rowSpan: number; colSpan: number }
   ) {
     this.state = state;
+    const theme = getTheme();
 
     this.widget = grid.set(
       position.row,
@@ -20,7 +22,7 @@ export class TimeLogPanel {
       position.colSpan,
       blessed.box,
       {
-        label: 'Weekly Time Tracking',
+        label: ' Time Tracking ',
         tags: true,
         scrollable: true,
         alwaysScroll: true,
@@ -31,12 +33,12 @@ export class TimeLogPanel {
         scrollbar: {
           ch: '█',
           style: {
-            fg: 'blue',
+            fg: theme.primary,
           },
         },
         style: {
           border: {
-            fg: 'white',
+            fg: theme.border,
           },
         },
       }
@@ -65,12 +67,12 @@ export class TimeLogPanel {
   }
 
   render(): void {
-    const content = this.getWeeklyTimeLogTable();
+    const content = this.getSimpleTimeDisplay();
     this.widget.setContent(content);
     this.widget.screen.render();
   }
 
-  private getWeeklyTimeLogTable(): string {
+  private getSimpleTimeDisplay(): string {
     const allWorklogs = this.state.getState().worklogs;
     const timezone = 'Australia/Sydney';
     const today = moment.tz(timezone);
@@ -83,70 +85,67 @@ export class TimeLogPanel {
       worklogsByDate.set(date, existing + log.timeSpentSeconds);
     });
 
-    // Get last 10 working days
-    const days: { date: moment.Moment; hours: number; isToday: boolean }[] = [];
-    let currentDate = today.clone();
-    let daysAdded = 0;
-
-    while (daysAdded < 10) {
-      const weekday = currentDate.isoWeekday();
-      if (weekday <= 5) { // Monday to Friday only
-        const dateStr = currentDate.format('YYYY-MM-DD');
-        const seconds = worklogsByDate.get(dateStr) || 0;
-        const hours = Math.round((seconds / 3600) * 10) / 10; // Round to 1 decimal
-        days.unshift({
-          date: currentDate.clone(),
-          hours: hours,
-          isToday: dateStr === today.format('YYYY-MM-DD')
-        });
-        daysAdded++;
-      }
-      currentDate.subtract(1, 'day');
+    // Get this week's data
+    const thisWeekStart = today.clone().startOf('isoWeek');
+    const days: { day: string; hours: number; isToday: boolean }[] = [];
+    
+    for (let i = 0; i < 5; i++) { // Mon-Fri
+      const date = thisWeekStart.clone().add(i, 'days');
+      const dateStr = date.format('YYYY-MM-DD');
+      const seconds = worklogsByDate.get(dateStr) || 0;
+      const hours = Math.round((seconds / 3600) * 10) / 10;
+      
+      days.push({
+        day: date.format('ddd'),
+        hours: hours,
+        isToday: dateStr === today.format('YYYY-MM-DD')
+      });
     }
 
-    // Split into last week and this week
-    const thisWeekStart = today.clone().startOf('isoWeek');
-    const lastWeekDays = days.filter(d => d.date.isBefore(thisWeekStart));
-    const thisWeekDays = days.filter(d => d.date.isSameOrAfter(thisWeekStart));
+    const thisWeekTotal = days.reduce((sum, d) => sum + d.hours, 0);
 
-    // Calculate totals
-    const lastWeekTotal = lastWeekDays.reduce((sum, d) => sum + d.hours, 0);
-    const thisWeekTotal = thisWeekDays.reduce((sum, d) => sum + d.hours, 0);
-
-    // Build table
+    // Build clean display
     const lines: string[] = [];
     lines.push('');
-    lines.push('  ┌────────────────┬────────────┐');
-    lines.push('  │ Date           │ Hours      │');
-    lines.push('  ├────────────────┼────────────┤');
-
-    // Show last 3 days of last week if available
-    const lastWeekVisible = lastWeekDays.slice(-3);
-    if (lastWeekVisible.length > 0) {
-      lastWeekVisible.forEach(day => {
-        const dayName = day.date.format('dddd');
-        const hoursStr = day.hours.toString().padEnd(10);
-        lines.push(`  │ ${dayName.padEnd(14)} │ ${hoursStr} │`);
-      });
-      const summary = `Last week: ${lastWeekTotal}/40`;
-      lines.push(`  ├────────────────┼────────────┤ {gray-fg}${summary}{/gray-fg}`);
-    }
-
-    // Show this week
-    thisWeekDays.forEach(day => {
-      const dayName = day.date.format('dddd');
-      const emoji = day.isToday ? ' 📅' : '';
-      const label = day.isToday ? `Today${emoji}` : dayName;
-      const hoursStr = day.hours.toString().padEnd(10);
-      const hoursColor = day.hours >= 8 ? 'green-fg' : day.hours > 0 ? 'yellow-fg' : 'gray-fg';
-      lines.push(`  │ ${label.padEnd(14)} │ {${hoursColor}}${hoursStr}{/${hoursColor}} │`);
+    
+    // Days with hours
+    days.forEach(({ day, hours, isToday }) => {
+      const hourStr = hours.toFixed(1) + 'h';
+      const displayDay = isToday ? `{bold}${day}{/bold}` : day;
+      const bar = this.getProgressBar(hours, 8, 12);
+      
+      if (isToday) {
+        lines.push(`  {bold}${displayDay}  ${hourStr.padEnd(6)} ${bar}{/bold}`);
+      } else if (hours > 0) {
+        lines.push(`  ${displayDay}  ${hourStr.padEnd(6)} ${bar}`);
+      } else {
+        lines.push(`  {gray-fg}${day}  ${hourStr.padEnd(6)} ${bar}{/gray-fg}`);
+      }
     });
 
-    const thisWeekSummary = `This week: ${thisWeekTotal}/40`;
-    lines.push(`  └────────────────┴────────────┘ {cyan-fg}${thisWeekSummary}{/cyan-fg}`);
+    // Week total
+    lines.push('');
+    const weekProgress = Math.round((thisWeekTotal / 40) * 100);
+    const totalColor = thisWeekTotal >= 40 ? 'green-fg' : thisWeekTotal >= 30 ? 'yellow-fg' : 'white-fg';
+    lines.push(`  {${totalColor}}Week: ${thisWeekTotal.toFixed(1)}h / 40h ({bold}${weekProgress}%{/bold}){/${totalColor}}`);
     lines.push('');
 
     return lines.join('\n');
+  }
+
+  private getProgressBar(hours: number, target: number, maxWidth: number): string {
+    const percentage = Math.min(hours / target, 1);
+    const filledWidth = Math.round(percentage * maxWidth);
+    
+    if (hours === 0) {
+      return '{gray-fg}' + '─'.repeat(maxWidth) + '{/gray-fg}';
+    }
+    
+    const color = hours >= target ? 'green-fg' : hours > 0 ? 'yellow-fg' : 'gray-fg';
+    const filled = '█'.repeat(filledWidth);
+    const empty = '─'.repeat(maxWidth - filledWidth);
+    
+    return `{${color}}${filled}{/}{gray-fg}${empty}{/}`;
   }
 
   getWidget(): blessed.Widgets.BoxElement {
