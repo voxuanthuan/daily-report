@@ -55,7 +55,7 @@ async function main() {
 		sourcesContent: false,
 		platform: 'node',
 		outfile: 'dist/cli/index.js',
-		external: ['vscode', 'term.js', 'pty.js', 'blessed', 'blessed-contrib', 'open', 'clipboardy'],
+		external: ['vscode', 'term.js', 'pty.js', 'blessed', 'neo-blessed', 'blessed-contrib', 'open', 'clipboardy'],
 		banner: {
 			js: '#!/usr/bin/env node',
 		},

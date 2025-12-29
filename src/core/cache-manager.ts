@@ -16,7 +16,7 @@ export class CacheManager {
         // Watch for configuration changes and clear relevant caches
         const configWatcher = vscode.workspace.onDidChangeConfiguration(event => {
             if (event.affectsConfiguration('grappleDailyReport')) {
-                console.log('Jira configuration changed, clearing caches');
+
                 this.clearAllCaches();
             }
         });
@@ -28,7 +28,7 @@ export class CacheManager {
      * Clear all caches when configuration changes or on demand
      */
     public clearAllCaches(): void {
-        console.log('Clearing all extension caches');
+
 
         // Configuration cache is handled automatically by VSCodeConfigProvider
 

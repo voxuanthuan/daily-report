@@ -90,7 +90,7 @@ class TempoFetcher {
     // Check cache first
     const cached = worklogCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < WORKLOG_CACHE_TTL) {
-      console.log('Using cached worklog data for last six days');
+
       return cached.data;
     }
 
@@ -136,12 +136,12 @@ class TempoFetcher {
     // Check cache first
     const cached = worklogCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < WORKLOG_CACHE_TTL) {
-      console.log(`Using cached worklog data for ${sydneyStartDate} to ${sydneyEndDate}`);
+
       return cached.data;
     }
 
     try {
-      console.log(`Fetching fresh worklog data for ${sydneyStartDate} to ${sydneyEndDate}`);
+
       const requestBody = {
         authorIds: [this.workerId],
         from: sydneyStartDate,
@@ -169,7 +169,7 @@ class TempoFetcher {
   // Clear cache for testing or configuration changes
   static clearCache(): void {
     worklogCache.clear();
-    console.log('Tempo worklog cache cleared');
+
   }
 }
 

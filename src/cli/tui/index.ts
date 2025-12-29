@@ -1,4 +1,4 @@
-import blessed from 'blessed';
+import blessed from 'neo-blessed';
 import { TUIApp } from './app';
 import { CLIConfigProvider } from '../config-adapter';
 import { ConfigManager } from '../../core/config';

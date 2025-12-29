@@ -33,7 +33,6 @@ interface JiraIssue {
 export async function fetchAllTasks(configManager: ConfigManager): Promise<{ inProgress: any[]; open: any[] }> {
     // Check cache first
     if (taskCache && (Date.now() - taskCache.timestamp) < TASK_CACHE_TTL_MS) {
-        console.log('Using cached task data');
         return taskCache.data;
     }
 
@@ -71,7 +70,6 @@ const TASK_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 export async function fetchUserDisplayName(configManager: ConfigManager): Promise<any> {
     // Check cache first
     if (userCache && (Date.now() - userCache.timestamp) < USER_CACHE_TTL_MS) {
-        console.log('Using cached user info');
         return userCache.data;
     }
 
@@ -96,7 +94,6 @@ export async function fetchUserDisplayName(configManager: ConfigManager): Promis
 
         // Fallback: return cached data if available, otherwise default
         if (userCache) {
-            console.log('Using stale cached user info due to API error');
             return userCache.data;
         }
 
@@ -260,7 +257,6 @@ async function fetchJiraIssueDetails(issueKey: string, configManager: ConfigMana
   export async function fetchPreviousWorkdayTasks(workerId: string, tempoApiToken: string, configManager: ConfigManager): Promise<PreviousWorkdayResult> {
     // Check cache first
     if (previousWorkdayCache && (Date.now() - previousWorkdayCache.timestamp) < PREVIOUS_WORKDAY_CACHE_TTL) {
-        console.log('Using cached previous workday tasks');
         return previousWorkdayCache.data;
     }
 
@@ -271,17 +267,17 @@ async function fetchJiraIssueDetails(issueKey: string, configManager: ConfigMana
     const startDate = endDate.clone().subtract(14, 'days');
 
     try {
-      console.log('Fetching fresh previous workday tasks');
+
       // Single API call to fetch all worklogs in the range
       const allWorklogs = await tempoFetcher.fetchWorklogs(
         startDate.format('YYYY-MM-DD'),
         endDate.format('YYYY-MM-DD')
       );
 
-      console.log(`Fetched ${allWorklogs.length} worklogs in date range ${startDate.format('YYYY-MM-DD')} to ${endDate.format('YYYY-MM-DD')}`);
+
 
       if (allWorklogs.length === 0) {
-        console.log('No worklogs found in the last 14 days');
+
         const result = { tasks: [], actualDate: null, tasksWithWorklogs: [] };
         previousWorkdayCache = { data: result, timestamp: Date.now() };
         return result;
@@ -338,7 +334,7 @@ async function fetchJiraIssueDetails(issueKey: string, configManager: ConfigMana
             };
           });
 
-          console.log(`Found ${issueDetails.length} tasks for most recent workday: ${currentDateStr}`);
+
           const result = {
             tasks: issueDetails,
             actualDate: currentDateStr,
@@ -351,7 +347,7 @@ async function fetchJiraIssueDetails(issueKey: string, configManager: ConfigMana
         currentDay.subtract(1, 'day');
       }
 
-      console.log('No worklogs found on working days in the last 14 days');
+
       const result = { tasks: [], actualDate: null, tasksWithWorklogs: [] };
       previousWorkdayCache = { data: result, timestamp: Date.now() };
       return result;
@@ -368,5 +364,5 @@ async function fetchJiraIssueDetails(issueKey: string, configManager: ConfigMana
     taskCache = null;
     previousWorkdayCache = null;
     issueDetailsCache.clear();
-    console.log('All caches cleared');
+
   }

@@ -1,5 +1,6 @@
-import blessed from 'blessed';
+import blessed from 'neo-blessed';
 import contrib from 'blessed-contrib';
+import { getTheme } from './theme';
 
 export interface LayoutPositions {
   todayPanel: { row: number; col: number; rowSpan: number; colSpan: number };
@@ -9,6 +10,34 @@ export interface LayoutPositions {
   timelogPanel: { row: number; col: number; rowSpan: number; colSpan: number };
   guideBar: { bottom: number; left: number; width: string; height: number };
 }
+
+/**
+ * Panel size constants for different terminal size categories
+ * Improves maintainability and visual hierarchy
+ */
+const PANEL_SIZES = {
+  standard: {
+    today: { rows: 5, cols: 5 },
+    yesterday: { rows: 3, cols: 5 },
+    todo: { rows: 4, cols: 5 },
+    details: { rows: 9, cols: 7 },      // Bigger - high priority
+    timelog: { rows: 3, cols: 7 },      // Smaller - low priority
+  },
+  small: {
+    today: { rows: 4, cols: 6 },
+    yesterday: { rows: 3, cols: 6 },
+    todo: { rows: 5, cols: 6 },
+    details: { rows: 9, cols: 6 },      // Bigger - high priority
+    timelog: { rows: 3, cols: 6 },      // Smaller - low priority
+  },
+  tiny: {
+    today: { rows: 3, cols: 12 },
+    yesterday: { rows: 3, cols: 12 },
+    todo: { rows: 3, cols: 12 },
+    details: { rows: 6, cols: 12 },
+    timelog: { rows: 3, cols: 12 },
+  },
+} as const;
 
 export class Layout {
   private screen: blessed.Widgets.Screen;
@@ -46,32 +75,35 @@ export class Layout {
     
     if (isTiny) {
       // Stack panels vertically for very small terminals
+      const sizes = PANEL_SIZES.tiny;
       return {
-        todayPanel: { row: 0, col: 0, rowSpan: 3, colSpan: 12 },
-        yesterdayPanel: { row: 3, col: 0, rowSpan: 3, colSpan: 12 },
-        todoPanel: { row: 6, col: 0, rowSpan: 3, colSpan: 12 },
-        detailsPanel: { row: 9, col: 0, rowSpan: 6, colSpan: 12 },
-        timelogPanel: { row: 15, col: 0, rowSpan: 3, colSpan: 12 },
+        todayPanel: { row: 0, col: 0, rowSpan: sizes.today.rows, colSpan: sizes.today.cols },
+        yesterdayPanel: { row: 3, col: 0, rowSpan: sizes.yesterday.rows, colSpan: sizes.yesterday.cols },
+        todoPanel: { row: 6, col: 0, rowSpan: sizes.todo.rows, colSpan: sizes.todo.cols },
+        detailsPanel: { row: 9, col: 0, rowSpan: sizes.details.rows, colSpan: sizes.details.cols },
+        timelogPanel: { row: 15, col: 0, rowSpan: sizes.timelog.rows, colSpan: sizes.timelog.cols },
         guideBar: { bottom: 0, left: 0, width: '100%', height: 1 },
       };
     } else if (isSmall) {
-      // Compact layout for small terminals
+      // Compact layout for small terminals - optimized for narrow screens
+      const sizes = PANEL_SIZES.small;
       return {
-        todayPanel: { row: 0, col: 0, rowSpan: 4, colSpan: 6 },
-        yesterdayPanel: { row: 4, col: 0, rowSpan: 4, colSpan: 6 },
-        todoPanel: { row: 8, col: 0, rowSpan: 4, colSpan: 6 },
-        detailsPanel: { row: 0, col: 6, rowSpan: 9, colSpan: 6 },
-        timelogPanel: { row: 9, col: 6, rowSpan: 3, colSpan: 6 },
+        todayPanel: { row: 0, col: 0, rowSpan: sizes.today.rows, colSpan: sizes.today.cols },
+        yesterdayPanel: { row: 4, col: 0, rowSpan: sizes.yesterday.rows, colSpan: sizes.yesterday.cols },
+        todoPanel: { row: 7, col: 0, rowSpan: sizes.todo.rows, colSpan: sizes.todo.cols },
+        detailsPanel: { row: 0, col: 6, rowSpan: sizes.details.rows, colSpan: sizes.details.cols },
+        timelogPanel: { row: 9, col: 6, rowSpan: sizes.timelog.rows, colSpan: sizes.timelog.cols },
         guideBar: { bottom: 0, left: 0, width: '100%', height: 1 },
       };
     } else {
-      // Default layout for standard terminals
+      // Default layout for standard terminals - prioritizes Today and Details panels
+      const sizes = PANEL_SIZES.standard;
       return {
-        todayPanel: { row: 0, col: 0, rowSpan: 4, colSpan: 4 },
-        yesterdayPanel: { row: 4, col: 0, rowSpan: 4, colSpan: 4 },
-        todoPanel: { row: 8, col: 0, rowSpan: 4, colSpan: 9 },
-        timelogPanel: { row: 8, col: 9, rowSpan: 4, colSpan: 3 },
-        detailsPanel: { row: 0, col: 4, rowSpan: 8, colSpan: 8 },
+        todayPanel: { row: 0, col: 0, rowSpan: sizes.today.rows, colSpan: sizes.today.cols },
+        yesterdayPanel: { row: 5, col: 0, rowSpan: sizes.yesterday.rows, colSpan: sizes.yesterday.cols },
+        todoPanel: { row: 8, col: 0, rowSpan: sizes.todo.rows, colSpan: sizes.todo.cols },
+        detailsPanel: { row: 0, col: 5, rowSpan: sizes.details.rows, colSpan: sizes.details.cols },
+        timelogPanel: { row: 9, col: 5, rowSpan: sizes.timelog.rows, colSpan: sizes.timelog.cols },
         guideBar: { bottom: 0, left: 0, width: '100%', height: 1 },
       };
     }
@@ -116,26 +148,47 @@ export class Layout {
   }
 
   private formatGuideBarContent(): string {
-    // Action labels in cyan, shortcuts in white/grey, separators dimmed
-    const cyan = 'cyan-fg';
-    const white = 'white-fg';
-    const grey = 'gray-fg';
-    const yellow = 'yellow-fg';
+    const theme = getTheme();
+    const action = 'white-fg';   // White for action names
+    const key = 'yellow-fg';     // Yellow for keyboard shortcuts
+    const sep = 'gray-fg';       // Grey for separators
 
+    // Guide bar format: Action: key | Action: key
+    // Similar to git staging UI style
     const shortcuts = [
-      `{${cyan}}Navigate:{/${cyan}} {${white}}hjkl/Ctrl-fb/Tab{/${white}}`,
-      `{${cyan}}Panels:{/${cyan}} {${white}}1-3,0{/${white}}`,
-      `{${cyan}}Actions:{/${cyan}} {${white}}a{/${white}}`,
-      `{${cyan}}Open:{/${cyan}} {${white}}Enter{/${white}}`,
-      `{${cyan}}Log:{/${cyan}} {${white}}i{/${white}}{${grey}}/{/${grey}}{${yellow}}I{/${yellow}}`,
-      `{${cyan}}Status:{/${cyan}} {${white}}s{/${white}}`,
-      `{${cyan}}Copy:{/${cyan}} {${white}}yy{/${white}}{${grey}}/{/${grey}}{${yellow}}Y{/${yellow}}{${grey}}/{/${grey}}{${white}}c{/${white}}`,
-      `{${cyan}}Refresh:{/${cyan}} {${white}}r{/${white}}`,
-      `{${cyan}}Help:{/${cyan}} {${white}}?{/${white}}`,
-      `{${cyan}}Quit:{/${cyan}} {${white}}q{/${white}}`,
+      // Navigation
+      `{${action}}Move:{/${action}} {${key}}↑↓←→/hjkl{/${key}}`,
+      // Panel navigation
+      `{${action}}Today:{/${action}} {${key}}1{/${key}}`,
+      `{${action}}Yesterday:{/${action}} {${key}}2{/${key}}`,
+      `{${action}}Todo:{/${action}} {${key}}3{/${key}}`,
+      `{${action}}Details:{/${action}} {${key}}0{/${key}}`,
+      // Actions
+      `{${action}}Open:{/${action}} {${key}}Enter{/${key}}`,
+      `{${action}}LogTime:{/${action}} {${key}}i{/${key}}`,
+      `{${action}}Status:{/${action}} {${key}}s{/${key}}`,
+      // Copy
+      `{${action}}CopyTitle:{/${action}} {${key}}yy{/${key}}`,
+      `{${action}}CopyID:{/${action}} {${key}}Y{/${key}}`,
+      // Utilities
+      `{${action}}Help:{/${action}} {${key}}?{/${key}}`,
+      `{${action}}Refresh:{/${action}} {${key}}r{/${key}}`,
+      `{${action}}Quit:{/${action}} {${key}}q{/${key}}`,
     ];
 
-    return shortcuts.join(` {${grey}}│{/${grey}} `);
+    return shortcuts.join(` {${sep}}|{/${sep}} `);
+  }
+
+  updateGuideBar(guideBar: blessed.Widgets.BoxElement, spinner?: string): void {
+    if (spinner) {
+      // Show spinner at the start of guide bar, keep shortcuts visible
+      const yellow = 'yellow-fg';
+      const grey = 'gray-fg';
+      guideBar.setContent(`{${yellow}}${spinner}{/${yellow}} {${grey}}│{/${grey}} ${this.formatGuideBarContent()}`);
+    } else {
+      // Show normal guide bar
+      guideBar.setContent(this.formatGuideBarContent());
+    }
   }
   
   /**
