@@ -1,4 +1,4 @@
-import blessed from 'blessed';
+import blessed from 'neo-blessed';
 import axios from 'axios';
 import { ConfigManager } from '../../../core/config';
 import { ActionResult } from './open-url';
@@ -133,7 +133,7 @@ export class ChangeStatusAction {
       const items = transitions.map(t => {
         // Mark current status with indicator
         if (currentStatus && t.name.toLowerCase() === currentStatus.toLowerCase()) {
-          return `${t.name} {gray-fg}(current){/gray-fg}`;
+          return `${t.name} {white-fg}(current){/white-fg}`;
         }
         return t.name;
       });

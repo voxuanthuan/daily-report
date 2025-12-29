@@ -1,6 +1,6 @@
-import blessed from 'blessed';
+import blessed from 'neo-blessed';
 import { StateManager } from '../state';
-import { getIssueIcon } from '../theme';
+import { getIssueIcon, getStatusIcon, getStatusColor, getPriorityIcon, getPriorityColor, formatSectionHeader, getScrollbarStyle, getTheme } from '../theme';
 import { ConfigManager } from '../../../core/config';
 
 interface JiraIssue {
@@ -46,33 +46,17 @@ export class DetailsPanel {
         keys: true,
         vi: true,
         mouse: true,
-        border: 'line',
-        scrollbar: {
-          ch: '█',
-          style: {
-            fg: 'blue',
-          },
+        border: {
+          type: 'line',
         },
+        scrollbar: getScrollbarStyle(),
         style: {
           border: {
-            fg: 'white',
+            fg: getTheme().border,
           },
         },
       }
     );
-
-    // Set rounded border characters after creation
-    (this.widget as any).border.type = 'line';
-    (this.widget as any).border.ch = {
-      top: '─',
-      bottom: '─',
-      left: '│',
-      right: '│',
-      tl: '╭',
-      tr: '╮',
-      bl: '╰',
-      br: '╯',
-    };
 
     this.setupKeyHandlers();
     this.subscribe();
@@ -202,7 +186,7 @@ export class DetailsPanel {
     const task = this.state.getCurrentTask();
 
     if (!task) {
-      this.widget.setContent('{center}{gray-fg}No task selected{/gray-fg}{/center}');
+      this.widget.setContent('{center}{white-fg}No task selected{/white-fg}{/center}');
       this.widget.screen.render();
       return;
     }
@@ -226,27 +210,28 @@ export class DetailsPanel {
     const imageCount = this.imageUrls.length;
     const isKitty = process.env.TERM === 'xterm-kitty' || process.env.KITTY_WINDOW_ID;
     const imageAction = isKitty ? 'show in terminal' : 'open in browser';
-    const imageHint = imageCount > 0 ? `\n{gray-fg}(Press 'i' to ${imageAction} ${imageCount} image${imageCount > 1 ? 's' : ''}){/gray-fg}` : '';
+    const imageHint = imageCount > 0 ? `\n{white-fg}(Press 'i' to ${imageAction} ${imageCount} image${imageCount > 1 ? 's' : ''}){/white-fg}` : '';
 
     // Get recent time logs for this task
     const recentTimeLogs = this.getRecentTimeLogsForTask(key);
 
     const content = `
-{bold}${key}: ${summary}{/bold}
+${formatSectionHeader('Task Info', 50)}
+{bold}${key}{/bold}: ${summary}
 
 {cyan-fg}Type:{/cyan-fg}     ${getIssueIcon(type)} ${type}
-{cyan-fg}Status:{/cyan-fg}   ${status}
-{cyan-fg}Priority:{/cyan-fg} ${priority}
+{cyan-fg}Status:{/cyan-fg}   ${this.formatStatusBadge(status)}
+{cyan-fg}Priority:{/cyan-fg} ${this.formatPriorityBadge(priority)}
 {cyan-fg}Assignee:{/cyan-fg} ${assignee}
 
-{cyan-fg}Description:{/cyan-fg}${imageHint}
-${formattedDescription}
+${formatSectionHeader('Description', 50)}${imageHint}
+${formattedDescription || '{white-fg}No description{/white-fg}'}
 
-{cyan-fg}Task Time Logs:{/cyan-fg}
+${formatSectionHeader('Recent Time Logs', 50)}
 ${recentTimeLogs}
 
-{cyan-fg}URL:{/cyan-fg}
-${url}
+${formatSectionHeader('Link', 50)}
+{underline}${url}{/underline}
     `.trim();
 
     this.widget.setContent(content);
@@ -295,7 +280,7 @@ ${url}
         const alt = node.attrs?.alt || 'image';
         if (url) {
           this.imageUrls.push(url); // Store image URL
-          return `{cyan-fg}[Image: ${alt}]{/cyan-fg}\n{gray-fg}${url}{/gray-fg}`;
+          return `{cyan-fg}[Image: ${alt}]{/cyan-fg}\n{white-fg}${url}{/white-fg}`;
         }
         return `{cyan-fg}[Image: ${alt}]{/cyan-fg}`;
       }
@@ -326,7 +311,7 @@ ${url}
       if (node.type === 'codeBlock') {
         const code = node.content ? node.content.map(processNode).join('') : '';
         const language = node.attrs?.language || '';
-        return `\n{gray-fg}[Code${language ? ` - ${language}` : ''}]{/gray-fg}\n${code}\n`;
+        return `\n{white-fg}[Code${language ? ` - ${language}` : ''}]{/white-fg}\n${code}\n`;
       }
 
       // Inline code
@@ -402,7 +387,7 @@ ${url}
     const taskWorklogs = allWorklogs.filter(log => log.issue.key === taskKey);
 
     if (taskWorklogs.length === 0) {
-      return '{gray-fg}No recent time logs{/gray-fg}';
+      return '{white-fg}No recent time logs{/white-fg}';
     }
 
     // Sort by date (most recent first)
@@ -435,6 +420,18 @@ ${url}
     } else {
       return `${minutes}m`;
     }
+  }
+
+  private formatStatusBadge(status: string): string {
+    const color = getStatusColor(status);
+    const icon = getStatusIcon(status);
+    return `{${color}-fg}${icon} ${status}{/${color}-fg}`;
+  }
+
+  private formatPriorityBadge(priority: string): string {
+    const color = getPriorityColor(priority);
+    const icon = getPriorityIcon(priority);
+    return `{${color}-fg}${icon} ${priority}{/${color}-fg}`;
   }
 
   getWidget(): blessed.Widgets.BoxElement {

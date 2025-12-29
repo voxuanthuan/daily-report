@@ -63,7 +63,7 @@ export const STATUS_ICONS: Record<string, string> = {
 };
 
 export const STATUS_COLORS: Record<string, string> = {
-  'To Do': 'gray',
+  'To Do': 'white',        // Changed from 'gray' for better visibility on black backgrounds
   'In Progress': 'cyan',
   'Under Review': 'yellow',
   'Code Review': 'yellow',
@@ -91,6 +91,25 @@ export const CLAUDE_COLORS = {
 // Primary color used throughout the TUI for consistency
 export const PRIMARY_COLOR = CLAUDE_COLORS.CRAIL;
 
+// Semantic colors for UI elements and feedback
+export const SEMANTIC_COLORS = {
+  // Feedback colors
+  success: '#98c379',
+  warning: '#e5c07b',
+  error: '#e06c75',
+  info: '#61afef',
+
+  // UI element colors
+  scrollbar: PRIMARY_COLOR,
+  panelLabel: PRIMARY_COLOR,
+  focusedBorder: PRIMARY_COLOR,
+  unfocusedBorder: CLAUDE_COLORS.CLOUDY,
+
+  // Text emphasis - brightened for black background visibility
+  textMuted: '#9ca3af',      // Light gray instead of dark gray
+  textSecondary: '#d1cdc7',  // Lighter Cloudy for better visibility
+};
+
 interface ThemeColors {
   primary: string;          // Main brand/accent color
   focused: string;
@@ -112,13 +131,14 @@ interface ThemeColors {
 }
 
 // Dark theme (default) - using Claude's color palette
+// All colors optimized for visibility on black backgrounds
 const DARK_THEME: ThemeColors = {
   primary: PRIMARY_COLOR,        // Crail - warm terracotta for all interactive elements
   focused: PRIMARY_COLOR,        // Use Crail for focused panel borders
-  unfocused: CLAUDE_COLORS.CLOUDY, // Cloudy gray for unfocused borders
+  unfocused: '#d1cdc7',          // Brighter Cloudy for unfocused borders (visible on black)
   selectedBg: PRIMARY_COLOR,     // Use Crail for selected item backgrounds
   selectedFg: '#ffffff',         // White for selected item text
-  border: CLAUDE_COLORS.CLOUDY,  // Cloudy gray for default borders
+  border: '#d1cdc7',             // Brighter Cloudy for default borders (visible on black)
   error: '#e06c75',              // Softer red
   success: '#98c379',            // Green
   warning: '#e5c07b',            // Yellow
@@ -126,9 +146,9 @@ const DARK_THEME: ThemeColors = {
   bg: 'black',
   fg: 'white',
   accent: PRIMARY_COLOR,         // Use Crail as accent
-  muted: CLAUDE_COLORS.CLOUDY,   // Cloudy for muted text
+  muted: '#9ca3af',              // Light gray for muted text (visible on black)
   highlight: '#D17A5A',          // Lighter Crail for highlights
-  dimmed: '#3e4451',             // Dark gray
+  dimmed: '#6b7280',             // Medium gray instead of dark gray (visible on black)
 };
 
 // Light theme - using Claude's color palette
@@ -233,6 +253,26 @@ export function getListStyle(focused: boolean): Widgets.ListOptions<any>['style'
   }
 }
 
+/**
+ * Get consistent scrollbar styling using theme colors
+ */
+export function getScrollbarStyle(): { ch: string; style: { fg: string } } {
+  return {
+    ch: '|',  // Thinner scrollbar character
+    style: { fg: currentTheme.primary },
+  };
+}
+
+/**
+ * Format panel label with focus state styling
+ */
+export function getPanelLabelStyle(focused: boolean, label: string): string {
+  if (focused) {
+    return ` {bold}${label}{/bold} `;
+  }
+  return ` ${label} `;
+}
+
 export function getIssueIcon(issueType: string): string {
   return ISSUE_ICONS[issueType] || ISSUE_ICONS['default'];
 }
@@ -281,9 +321,9 @@ export function formatIssueForDisplay(
     ? summary.substring(0, availableWidth - 3) + '...'
     : summary;
   
-  // Add strikethrough effect for done/closed items (using dim styling)
+  // Use cyan color for done/closed items - visible on black background
   if (status === 'Done' || status === 'Closed') {
-    return `${prefix}{dim}${displaySummary}{/dim}`;
+    return `${prefix}{cyan-fg}${displaySummary}{/cyan-fg}`;
   }
   
   return `${prefix}${displaySummary}`;
@@ -341,4 +381,55 @@ export function bold(text: string): string {
  */
 export function dim(text: string): string {
   return `{dim}${text}{/dim}`;
+}
+
+/**
+ * Format task item for display in list panels
+ */
+export function formatTaskItem(
+  task: { key: string; summary: string; issuetype: string; priority?: string; status?: string },
+  options?: { showPriority?: boolean; maxWidth?: number }
+): string {
+  const opts = { showPriority: true, maxWidth: 60, ...options };
+  const icon = getIssueIcon(task.issuetype);
+  const priority = task.priority;
+
+  let prefix = '';
+
+  // Priority prefix for high/highest
+  if (opts.showPriority && priority) {
+    if (priority === 'Highest') {
+      prefix = `{red-fg}!{/red-fg} `;
+    } else if (priority === 'High') {
+      prefix = `{magenta-fg}!{/magenta-fg} `;
+    }
+  }
+
+  const keyAndSummary = `${icon} ${task.key}: ${task.summary}`;
+  const availableWidth = opts.maxWidth - prefix.length;
+
+  // Truncate if needed
+  const display = keyAndSummary.length > availableWidth
+    ? keyAndSummary.substring(0, availableWidth - 3) + '...'
+    : keyAndSummary;
+
+  // Use cyan for done items - visible on black background
+  if (task.status === 'Done' || task.status === 'Closed') {
+    return `${prefix}{cyan-fg}${display}{/cyan-fg}`;
+  }
+
+  return `${prefix}${display}`;
+}
+
+/**
+ * Format section header with visual divider
+ */
+export function formatSectionHeader(title: string, width: number = 40): string {
+  const dividerChar = '─';
+  const titleWithPadding = ` ${title} `;
+  const remainingWidth = width - titleWithPadding.length;
+  const leftDivider = dividerChar.repeat(Math.floor(remainingWidth / 2));
+  const rightDivider = dividerChar.repeat(Math.ceil(remainingWidth / 2));
+
+  return `{cyan-fg}${leftDivider}${titleWithPadding}${rightDivider}{/cyan-fg}`;
 }

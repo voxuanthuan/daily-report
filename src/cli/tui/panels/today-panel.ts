@@ -1,6 +1,6 @@
 import { BasePanel } from './base-panel';
 import { StateManager } from '../state';
-import { getIssueIcon } from '../theme';
+import { formatTaskItem } from '../theme';
 
 interface JiraIssue {
   id: string;
@@ -33,17 +33,19 @@ export class TodayPanel extends BasePanel {
     const tasks = state.tasks.inProgress;
 
     if (tasks.length === 0) {
-      items.push('{gray-fg}No tasks{/gray-fg}');
+      items.push('{white-fg}No tasks in progress{/white-fg}');
+      items.push('');
+      items.push('{white-fg}Tip: Press r to refresh{/white-fg}');
     } else {
-      const selectedIndex = this.state.getState().panels.today.selectedIndex;
-      
-      tasks.forEach((task, index) => {
-        const issueType = task.fields?.issuetype?.name || 'Task';
-        const key = task.key || task.id;
-        const summary = task.fields.summary;
-
-        // Show full text for all items
-        items.push(`${getIssueIcon(issueType)} ${key}: ${summary}`);
+      tasks.forEach((task) => {
+        const formatted = formatTaskItem({
+          key: task.key || task.id,
+          summary: task.fields.summary,
+          issuetype: task.fields?.issuetype?.name || 'Task',
+          priority: task.fields?.priority?.name,
+          status: task.fields?.status?.name,
+        });
+        items.push(formatted);
       });
     }
 

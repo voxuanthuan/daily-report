@@ -1,4 +1,4 @@
-import blessed from 'blessed';
+import blessed from 'neo-blessed';
 import { StateManager } from '../state';
 import { getTheme } from '../theme';
 import moment from 'moment-timezone';
@@ -29,7 +29,9 @@ export class TimeLogPanel {
         keys: true,
         vi: true,
         mouse: true,
-        border: 'line',
+        border: {
+          type: 'line',
+        },
         scrollbar: {
           ch: '█',
           style: {
@@ -43,19 +45,6 @@ export class TimeLogPanel {
         },
       }
     );
-
-    // Set rounded border characters
-    (this.widget as any).border.type = 'line';
-    (this.widget as any).border.ch = {
-      top: '─',
-      bottom: '─',
-      left: '│',
-      right: '│',
-      tl: '╭',
-      tr: '╮',
-      bl: '╰',
-      br: '╯',
-    };
 
     this.subscribe();
   }
@@ -88,13 +77,13 @@ export class TimeLogPanel {
     // Get this week's data
     const thisWeekStart = today.clone().startOf('isoWeek');
     const days: { day: string; hours: number; isToday: boolean }[] = [];
-    
+
     for (let i = 0; i < 5; i++) { // Mon-Fri
       const date = thisWeekStart.clone().add(i, 'days');
       const dateStr = date.format('YYYY-MM-DD');
       const seconds = worklogsByDate.get(dateStr) || 0;
       const hours = Math.round((seconds / 3600) * 10) / 10;
-      
+
       days.push({
         day: date.format('ddd'),
         hours: hours,
@@ -107,27 +96,35 @@ export class TimeLogPanel {
     // Build clean display
     const lines: string[] = [];
     lines.push('');
-    
-    // Days with hours
+
+    // Week header with date range
+    const weekStart = thisWeekStart.format('MMM D');
+    const weekEnd = thisWeekStart.clone().add(4, 'days').format('MMM D');
+    lines.push(`{bold}Week: ${weekStart} - ${weekEnd}{/bold}`);
+    lines.push('');
+
+    // Days with enhanced progress bars
     days.forEach(({ day, hours, isToday }) => {
-      const hourStr = hours.toFixed(1) + 'h';
-      const displayDay = isToday ? `{bold}${day}{/bold}` : day;
-      const bar = this.getProgressBar(hours, 8, 12);
-      
+      const hourStr = hours.toFixed(1).padStart(5) + 'h';
+      const dayLabel = isToday ? `{bold}{underline}${day}{/underline}{/bold}` : day;
+      const bar = this.getEnhancedProgressBar(hours, 8, 15);
+
       if (isToday) {
-        lines.push(`  {bold}${displayDay}  ${hourStr.padEnd(6)} ${bar}{/bold}`);
+        lines.push(`  ${dayLabel} ${hourStr} ${bar} {cyan-fg}<{/cyan-fg}`);
+      } else if (hours >= 8) {
+        lines.push(`  ${dayLabel} ${hourStr} ${bar} {green-fg}✓{/green-fg}`);
       } else if (hours > 0) {
-        lines.push(`  ${displayDay}  ${hourStr.padEnd(6)} ${bar}`);
+        lines.push(`  ${dayLabel} ${hourStr} ${bar}`);
       } else {
-        lines.push(`  {gray-fg}${day}  ${hourStr.padEnd(6)} ${bar}{/gray-fg}`);
+        lines.push(`  {white-fg}${day} ${hourStr} ${bar}{/white-fg}`);
       }
     });
 
-    // Week total
+    // Week summary with goal indicator
     lines.push('');
-    const weekProgress = Math.round((thisWeekTotal / 40) * 100);
-    const totalColor = thisWeekTotal >= 40 ? 'green-fg' : thisWeekTotal >= 30 ? 'yellow-fg' : 'white-fg';
-    lines.push(`  {${totalColor}}Week: ${thisWeekTotal.toFixed(1)}h / 40h ({bold}${weekProgress}%{/bold}){/${totalColor}}`);
+    const weekColor = thisWeekTotal >= 40 ? 'green' : thisWeekTotal >= 32 ? 'yellow' : 'white';
+    const goalIndicator = thisWeekTotal >= 40 ? ' ✓ Goal reached!' : '';
+    lines.push(`  {${weekColor}-fg}{bold}Total: ${thisWeekTotal.toFixed(1)}h{/bold} / 40h${goalIndicator}{/${weekColor}-fg}`);
     lines.push('');
 
     return lines.join('\n');
@@ -136,16 +133,36 @@ export class TimeLogPanel {
   private getProgressBar(hours: number, target: number, maxWidth: number): string {
     const percentage = Math.min(hours / target, 1);
     const filledWidth = Math.round(percentage * maxWidth);
-    
+
     if (hours === 0) {
-      return '{gray-fg}' + '─'.repeat(maxWidth) + '{/gray-fg}';
+      return '{white-fg}' + '─'.repeat(maxWidth) + '{/white-fg}';
     }
-    
+
     const color = hours >= target ? 'green-fg' : hours > 0 ? 'yellow-fg' : 'gray-fg';
     const filled = '█'.repeat(filledWidth);
     const empty = '─'.repeat(maxWidth - filledWidth);
-    
-    return `{${color}}${filled}{/}{gray-fg}${empty}{/}`;
+
+    return `{${color}}${filled}{/}{white-fg}${empty}{/}`;
+  }
+
+  private getEnhancedProgressBar(hours: number, target: number, width: number): string {
+    const percentage = Math.min(hours / target, 1);
+    const filledWidth = Math.round(percentage * width);
+
+    // Use different characters for visual appeal
+    const filled = '\u2588'.repeat(filledWidth);     // Full block
+    const empty = '\u2591'.repeat(width - filledWidth); // Light shade
+
+    let color = 'gray';
+    if (hours >= target) {
+      color = 'green';
+    } else if (hours >= target * 0.5) {
+      color = 'yellow';
+    } else if (hours > 0) {
+      color = 'cyan';
+    }
+
+    return `{${color}-fg}${filled}{/}{white-fg}${empty}{/}`;
   }
 
   getWidget(): blessed.Widgets.BoxElement {

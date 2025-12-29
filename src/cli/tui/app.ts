@@ -1,4 +1,4 @@
-import blessed from 'blessed';
+import blessed from 'neo-blessed';
 import { ConfigManager } from '../../core/config';
 import { StateManager, PanelType } from './state';
 import { Layout } from './layout';
@@ -15,6 +15,7 @@ import { fetchAllTasks, fetchUserDisplayName, extractPreviousWorkdayTasks, clear
 import TempoFetcher from '../../core/tempo/fetcher';
 import { CacheManager, RequestDeduplicator, debounce } from './utils/cache';
 import { getTheme } from './theme';
+import { applyRoundedCorners } from './utils/rounded-corners';
 
 export class TUIApp {
   private screen: blessed.Widgets.Screen;
@@ -95,6 +96,13 @@ export class TUIApp {
 
     // Create guide bar at the bottom
     this.guideBar = this.layout.createGuideBar();
+
+    // Apply rounded corners to all panels
+    applyRoundedCorners(this.panels.today.getWidget());
+    applyRoundedCorners(this.panels.yesterday.getWidget());
+    applyRoundedCorners(this.panels.todo.getWidget());
+    applyRoundedCorners(this.panels.details.getWidget());
+    applyRoundedCorners(this.panels.timelog.getWidget());
 
     this.actions = {
       openUrl: new OpenUrlAction(this.configManager),
@@ -265,7 +273,7 @@ export class TUIApp {
   }
 
   private async loadInitialData(): Promise<void> {
-    this.showLoadingIndicator('Loading data...');
+    this.showLoadingIndicator();
     this.state.setLoading(true);
     this.state.setStatusMessage('Loading data...');
 
@@ -273,15 +281,15 @@ export class TUIApp {
       // Use cache for tasks if available
       let tasks = this.cacheManager.get<any>('tasks');
       let user = this.cacheManager.get<any>('user');
-      
+
       // Deduplicate concurrent requests
-      const taskPromise = tasks ? Promise.resolve(tasks) : 
+      const taskPromise = tasks ? Promise.resolve(tasks) :
         this.requestDeduplicator.execute('fetchTasks', () => fetchAllTasks(this.configManager));
-      const userPromise = user ? Promise.resolve(user) : 
+      const userPromise = user ? Promise.resolve(user) :
         this.requestDeduplicator.execute('fetchUser', () => fetchUserDisplayName(this.configManager));
-      
+
       [tasks, user] = await Promise.all([taskPromise, userPromise]);
-      
+
       // Cache the results
       this.cacheManager.set('tasks', tasks, 180000); // 3 minutes
       this.cacheManager.set('user', user, 600000); // 10 minutes
@@ -295,14 +303,14 @@ export class TUIApp {
         user.accountId
       );
 
-      this.updateLoadingIndicator('Fetching worklogs...');
+      this.state.setStatusMessage('Fetching worklogs...');
       const tempoApiToken = await this.configManager.getTempoApiToken();
       const fetcher = new TempoFetcher(user.accountId, tempoApiToken);
-      
+
       // Use cache for worklogs
       let worklogs = this.cacheManager.get<any>('worklogs');
       if (!worklogs) {
-        worklogs = await this.requestDeduplicator.execute('fetchWorklogs', () => 
+        worklogs = await this.requestDeduplicator.execute('fetchWorklogs', () =>
           fetcher.fetchLastSixDaysWorklogs()
         );
         this.cacheManager.set('worklogs', worklogs, 120000); // 2 minutes
@@ -310,7 +318,7 @@ export class TUIApp {
 
       this.state.updateWorklogs(worklogs);
 
-      this.updateLoadingIndicator('Processing tasks...');
+      this.state.setStatusMessage('Processing tasks...');
       const yesterdayResult = await extractPreviousWorkdayTasks(
         worklogs,
         user.accountId,
@@ -324,10 +332,10 @@ export class TUIApp {
       this.hideLoadingIndicator();
       this.state.setLoading(false);
       this.state.setLastRefresh(new Date());
-      
+
       // Update status bar with statistics
       this.panels.status.updateStats(tasks, worklogs);
-      
+
       this.state.setStatusMessage('Ready');
     } catch (error) {
       this.hideLoadingIndicator();
@@ -346,47 +354,87 @@ export class TUIApp {
   }
 
   async refresh(): Promise<void> {
-    this.panels.status.setMessage('Refreshing data...', 'info');
+    this.showLoadingIndicator();
     try {
       // Clear both app cache and core caches
       this.cacheManager.clear();
       clearCaches();
       await this.loadInitialData();
+      this.hideLoadingIndicator();
       this.renderAllPanels();
-      this.panels.status.setMessage('Data refreshed', 'success');
+      this.panels.status.setMessage('✓ Data refreshed successfully', 'success');
     } catch (error) {
+      this.hideLoadingIndicator();
       this.panels.status.setMessage(
-        `Refresh failed: ${error instanceof Error ? error.message : String(error)}`,
+        `✗ Refresh failed: ${error instanceof Error ? error.message : String(error)}`,
         'error'
       );
     }
   }
   
   /**
-   * Show loading indicator
+   * Show a temporary toast message
+   * Appears in top-right, auto-dismisses
    */
-  private showLoadingIndicator(message: string): void {
-    this.panels.status.setMessage(`⏳ ${message}`, 'info');
-    // Optional: Add animated loading indicator
+  private showToast(message: string, type: 'success' | 'error' | 'info' = 'info', durationMs: number = 2000): void {
+    const theme = getTheme();
+    const colorMap = {
+      success: 'green',
+      error: 'red',
+      info: 'cyan',
+    };
+    const iconMap = {
+      success: '\u2713', // checkmark
+      error: '\u2717',   // x mark
+      info: '\u2139',    // info
+    };
+
+    const toast = blessed.box({
+      parent: this.screen,
+      top: 1,
+      right: 2,
+      width: Math.min(message.length + 6, 50),
+      height: 3,
+      content: `{center}{${colorMap[type]}-fg}${iconMap[type]} ${message}{/${colorMap[type]}-fg}{/center}`,
+      tags: true,
+      border: {
+        type: 'line',
+        ch: { tl: '\u256D', tr: '\u256E', bl: '\u2570', br: '\u256F' }
+      } as any,
+      style: {
+        border: { fg: colorMap[type] },
+      },
+    });
+
+    this.screen.render();
+
+    setTimeout(() => {
+      toast.detach();
+      this.screen.render();
+    }, durationMs);
+  }
+
+  /**
+   * Show loading indicator with optional message
+   */
+  private showLoadingIndicator(message?: string): void {
+    // Stop any existing loading indicator first
+    this.hideLoadingIndicator();
+
+    // Add animated loading indicator
     const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
     let frame = 0;
-    
+    const displayMessage = message || 'Loading';
+
     this.loadingIndicator = setInterval(() => {
-      this.panels.status.setMessage(`${frames[frame]} ${message}`, 'info');
+      const spinner = frames[frame];
+      const statusText = `{yellow-fg}${spinner} ${displayMessage}...{/yellow-fg}`;
+      this.layout.updateGuideBar(this.guideBar, statusText);
+      this.screen.render();
       frame = (frame + 1) % frames.length;
     }, 80);
   }
-  
-  /**
-   * Update loading indicator message
-   */
-  private updateLoadingIndicator(message: string): void {
-    if (this.loadingIndicator) {
-      this.hideLoadingIndicator();
-      this.showLoadingIndicator(message);
-    }
-  }
-  
+
   /**
    * Hide loading indicator
    */
@@ -394,6 +442,9 @@ export class TUIApp {
     if (this.loadingIndicator) {
       clearInterval(this.loadingIndicator);
       this.loadingIndicator = null;
+      // Restore normal guide bar
+      this.layout.updateGuideBar(this.guideBar);
+      this.screen.render();
     }
   }
 
@@ -424,15 +475,77 @@ export class TUIApp {
     }
 
     const result = await this.actions.logTime.execute(task, withDateAndDescription);
+    
+    // Show result popup
     if (result.success) {
-      this.panels.status.setMessage(result.message || 'Time logged', 'success');
+      await this.showResultPopup('✓ Success', result.message || 'Time logged successfully', 'success');
       // Refresh data to show new worklog
       await this.refresh();
     } else if (result.message) {
       this.panels.status.setMessage(result.message, 'info');
     } else {
-      this.panels.status.setMessage(result.error || 'Failed to log time', 'error');
+      await this.showResultPopup('✗ Error', result.error || 'Failed to log time', 'error');
     }
+  }
+
+  /**
+   * Show a result popup with the outcome of an action
+   */
+  private showResultPopup(title: string, message: string, type: 'success' | 'error'): Promise<void> {
+    return new Promise((resolve) => {
+      const theme = getTheme();
+      const color = type === 'success' ? 'green' : 'red';
+      const icon = type === 'success' ? '✓' : '✗';
+
+      const popup = blessed.box({
+        parent: this.screen,
+        top: 'center',
+        left: 'center',
+        width: '50%',
+        height: 10,
+        content: `{center}{bold}{${color}-fg}${icon} ${title}{/${color}-fg}{/bold}\n\n{white-fg}${message}{/white-fg}\n\n{white-fg}Press any key to continue...{/white-fg}{/center}`,
+        tags: true,
+        border: {
+          type: 'line',
+          ch: {
+            'top': '─',
+            'bottom': '─',
+            'left': '│',
+            'right': '│',
+            'tl': '╭',
+            'tr': '╮',
+            'bl': '╰',
+            'br': '╯'
+          }
+        } as any,
+        style: {
+          border: {
+            fg: color,
+          },
+        },
+        shadow: true,
+      });
+
+      const closePopup = () => {
+        popup.detach();
+        this.screen.render();
+        resolve();
+      };
+
+      // Close on any key
+      popup.key(['escape', 'enter', 'space', 'q'], closePopup);
+
+      // Shorter timeout for success, longer for errors
+      const autoCloseMs = type === 'success' ? 2000 : 4000;
+      setTimeout(() => {
+        if (popup.parent) {
+          closePopup();
+        }
+      }, autoCloseMs);
+
+      popup.focus();
+      this.screen.render();
+    });
   }
 
   private async handleChangeStatus(): Promise<void> {
@@ -456,28 +569,31 @@ export class TUIApp {
   private async handleCopyTitle(): Promise<void> {
     const task = this.state.getCurrentTask();
     if (!task) {
-      this.panels.status.setMessage('No task selected', 'warning');
+      this.showToast('No task selected', 'error');
       return;
     }
 
     const title = task.fields.summary;
-    await this.copyToClipboard(title);
-    const truncatedTitle = title.length > 40 ? title.substring(0, 40) + '...' : title;
-    this.panels.status.setMessage(`Copied: "${truncatedTitle}"`, 'success');
+    try {
+      await this.copyToClipboard(title);
+      this.showToast('Title copied!', 'success');
+    } catch {
+      this.showToast('Copy failed', 'error');
+    }
   }
 
   private handleCopyTicketId(): void {
     const task = this.state.getCurrentTask();
     if (!task) {
-      this.panels.status.setMessage('No task selected', 'warning');
+      this.showToast('No task selected', 'error');
       return;
     }
 
     const ticketId = task.key || task.id;
     this.copyToClipboard(ticketId).then(() => {
-      this.panels.status.setMessage(`Copied ticket ID: ${ticketId}`, 'success');
+      this.showToast(`Copied: ${ticketId}`, 'success');
     }).catch(() => {
-      // Error already handled in copyToClipboard
+      this.showToast('Copy failed', 'error');
     });
   }
 
@@ -550,20 +666,15 @@ export class TUIApp {
 
     try {
       await this.copyToClipboard(report);
-      this.panels.status.setMessage('Daily standup report copied to clipboard!', 'success');
+      this.showToast('Report copied!', 'success', 2500);
     } catch (error) {
-      // Error already handled in copyToClipboard
+      this.showToast('Copy failed', 'error');
     }
   }
 
   private async refreshTasks(): Promise<void> {
-    try {
-      const tasks = await fetchAllTasks(this.configManager);
-      this.state.updateTasks(tasks);
-      this.renderAllPanels();
-    } catch (error) {
-      this.panels.status.setMessage('Failed to refresh tasks', 'error');
-    }
+    // Call full refresh to update all data including worklogs and time tracking
+    await this.refresh();
   }
 
   private showActionsMenu(): void {
@@ -583,10 +694,22 @@ export class TUIApp {
       height: 14,
       label: ` Actions for ${key} `,
       tags: true,
-      border: 'line',
+      border: {
+        type: 'line',
+        ch: {
+          'top': '─',
+          'bottom': '─',
+          'left': '│',
+          'right': '│',
+          'tl': '╭',
+          'tr': '╮',
+          'bl': '╰',
+          'br': '╯'
+        }
+      } as any,
       style: {
-        border: { fg: theme.primary },  // Use primary color (Crail)
-        selected: { bg: theme.primary, fg: 'white' }  // Use primary color (Crail)
+        border: { fg: theme.primary },
+        selected: { bg: theme.primary, fg: 'white' }
       },
       keys: true,
       vi: true,
@@ -602,18 +725,6 @@ export class TUIApp {
         '{cyan-fg}r{/cyan-fg}  Refresh data',
       ]
     });
-
-    // Set rounded borders
-    (actionsMenu as any).border.ch = {
-      top: '─',
-      bottom: '─',
-      left: '│',
-      right: '│',
-      tl: '╭',
-      tr: '╮',
-      bl: '╰',
-      br: '╯',
-    };
 
     actionsMenu.on('select', async (item, index) => {
       actionsMenu.detach();
@@ -658,62 +769,52 @@ export class TUIApp {
       height: '70%',
       label: ' Help ',
       tags: true,
-      border: 'line',
+      border: {
+        type: 'line',
+        ch: {
+          'top': '─',
+          'bottom': '─',
+          'left': '│',
+          'right': '│',
+          'tl': '╭',
+          'tr': '╮',
+          'bl': '╰',
+          'br': '╯'
+        }
+      } as any,
       scrollable: true,
       keys: true,
       vi: true,
       style: {
         border: {
-          fg: theme.primary,  // Use primary color (Crail)
+          fg: theme.primary,
         },
       },
       content: `
-{bold}Jira Daily Report - Interactive TUI{/bold}
+{bold}Jira Daily Report - Quick Reference{/bold}
 
-{bold}Vim-Style Navigation:{/bold}
-  h / l              Navigate panels (left/right)
-  j / k              Navigate tasks (down/up)
-  Tab / Shift-Tab    Navigate panels (alternative)
-  1 / 2 / 3 / 0      Jump to specific panel
+{bold}Essential Shortcuts:{/bold}
+  {cyan-fg}hjkl{/cyan-fg}   Navigate (Vim-style)
+  {cyan-fg}Enter{/cyan-fg}  Open task in browser
+  {cyan-fg}i{/cyan-fg}      Log time (today)
+  {cyan-fg}c{/cyan-fg}      Copy daily report
+  {cyan-fg}?{/cyan-fg}      Toggle this help
 
-{bold}Panel Shortcuts:{/bold}
-  1                  TODAY panel
-  2                  YESTERDAY panel
-  3                  TODO panel
-  0                  DETAILS panel
+{bold}Panel Navigation:{/bold}
+  {cyan-fg}1{/cyan-fg} Today  {cyan-fg}2{/cyan-fg} Yesterday  {cyan-fg}3{/cyan-fg} Todo  {cyan-fg}0{/cyan-fg} Details
 
 {bold}Actions:{/bold}
-  Enter / o          Open selected task in browser
-  i                  Log time to selected task (today, no description)
-  I (Shift+i)        Log time with date and description
-  s                  Change task status
-  yy                 Copy task title to clipboard (from focused panel)
-  Y (Shift+y)        Copy ticket ID to clipboard (e.g., GRAP-12345)
-  c                  Copy daily standup report (Yesterday/Today/Blockers)
-  r / R              Refresh all data
-  q                  Quit application
-  ?                  Toggle this help screen
+  {cyan-fg}s{/cyan-fg}      Change task status
+  {cyan-fg}I{/cyan-fg}      Log time with date & description
+  {cyan-fg}yy{/cyan-fg}     Copy task title
+  {cyan-fg}Y{/cyan-fg}      Copy ticket ID
+  {cyan-fg}v{/cyan-fg}      View task images
+  {cyan-fg}a{/cyan-fg}      Show actions menu
+  {cyan-fg}r{/cyan-fg}      Refresh all data
 
-{bold}Layout:{/bold}
-  Left Panels        TODAY [1], YESTERDAY [2], TODO [3]
-  Right Top          DETAILS [0] - Task details (expanded for better viewing)
-  Right Bottom       TIMELOG - Weekly time summary (compact)
-
-{cyan-fg}Press ? or ESC to close this help screen{/cyan-fg}
+{white-fg}Press ? or ESC to close{/white-fg}
       `,
     });
-
-    // Set rounded border characters
-    (this.helpOverlay as any).border.ch = {
-      top: '─',
-      bottom: '─',
-      left: '│',
-      right: '│',
-      tl: '╭',
-      tr: '╮',
-      bl: '╰',
-      br: '╯',
-    };
 
     this.helpOverlay.key(['?', 'escape'], () => {
       this.toggleHelp();

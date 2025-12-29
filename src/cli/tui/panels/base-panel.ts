@@ -1,12 +1,13 @@
-import blessed from 'blessed';
+import blessed from 'neo-blessed';
 import { StateManager, PanelType } from '../state';
-import { getListStyle, getTheme } from '../theme';
+import { getListStyle, getTheme, getScrollbarStyle, getPanelLabelStyle } from '../theme';
 
 export abstract class BasePanel {
   protected widget: blessed.Widgets.ListElement;
   protected state: StateManager;
   protected panelType: PanelType;
   protected focused: boolean = false;
+  protected label: string;
 
   constructor(
     grid: any,
@@ -17,6 +18,7 @@ export abstract class BasePanel {
   ) {
     this.state = state;
     this.panelType = panelType;
+    this.label = label;
 
     const theme = getTheme();
 
@@ -34,29 +36,13 @@ export abstract class BasePanel {
         mouse: true,
         scrollable: true,
         alwaysScroll: true,
-        border: 'line',
-        scrollbar: {
-          ch: '█',
-          style: {
-            fg: theme.primary,  // Use primary color for scrollbar
-          },
+        border: {
+          type: 'line',
         },
+        scrollbar: getScrollbarStyle(),
         style: getListStyle(false),
       }
     );
-
-    // Set rounded border characters after creation
-    (this.widget as any).border.type = 'line';
-    (this.widget as any).border.ch = {
-      top: '─',
-      bottom: '─',
-      left: '│',
-      right: '│',
-      tl: '╭',
-      tr: '╮',
-      bl: '╰',
-      br: '╯',
-    };
 
     this.setupKeyHandlers();
     this.subscribe();
@@ -126,14 +112,18 @@ export abstract class BasePanel {
   protected updateLabelWithPosition(baseLabel: string): void {
     const items = this.state.getState().panels[this.panelType].items;
     const selectedIndex = this.state.getState().panels[this.panelType].selectedIndex;
-    
+
+    let labelText: string;
     if (items.length > 0) {
       const current = selectedIndex + 1;
       const total = items.length;
-      this.widget.setLabel(` ${baseLabel} (${current}/${total}) `);
+      labelText = `${baseLabel} (${current}/${total})`;
     } else {
-      this.widget.setLabel(` ${baseLabel} `);
+      labelText = baseLabel;
     }
+
+    // Use theme-consistent label styling with focus state
+    this.widget.setLabel(getPanelLabelStyle(this.focused, labelText));
   }
 
   protected subscribe(): void {
@@ -163,6 +153,9 @@ export abstract class BasePanel {
     if (focused) {
       this.widget.focus();
     }
+
+    // Trigger label update with focus state
+    this.render();
 
     this.widget.screen.render();
   }
