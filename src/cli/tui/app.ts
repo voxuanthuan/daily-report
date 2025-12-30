@@ -356,9 +356,10 @@ export class TUIApp {
   async refresh(): Promise<void> {
     this.showLoadingIndicator();
     try {
-      // Clear both app cache and core caches
+      // Clear all caches: app cache, task cache, and Tempo worklog cache
       this.cacheManager.clear();
       clearCaches();
+      TempoFetcher.clearCache(); // Clear Tempo worklog cache to get fresh data
       await this.loadInitialData();
       this.hideLoadingIndicator();
       this.renderAllPanels();

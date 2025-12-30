@@ -7,6 +7,7 @@ import { generateDailyReport } from '../core/generate-report';
 import { fetchUserDisplayName } from '../core/task-fetcher';
 import TempoWorklogCreator from '../core/tempo/worklog-creator';
 import TimesheetParser from '../core/tempo/timesheet-parser';
+import { startTUI } from './tui/index';
 import moment from 'moment-timezone';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -227,7 +228,6 @@ program
   .description('Launch interactive TUI (Terminal User Interface)')
   .action(async () => {
     try {
-      const { startTUI } = await import('./tui/index.js');
       await startTUI();
     } catch (error) {
       console.error('\x1b[31m✖\x1b[0m Error:', error instanceof Error ? error.message : String(error));

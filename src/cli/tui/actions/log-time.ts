@@ -258,15 +258,16 @@ export class LogTimeAction {
 
   /**
    * Attempt to get the last commit message from feature/{ticketId} branch
+   * Extracts just the description, removing commit prefix and ticket ID
    */
   private async getLastCommitMessage(ticketId: string): Promise<string> {
     try {
       const { exec } = await import('child_process');
       const { promisify } = await import('util');
       const execAsync = promisify(exec);
-      
+
       const branchName = `feature/${ticketId}`;
-      
+
       // Check if branch exists
       try {
         await execAsync(`git rev-parse --verify ${branchName}`);
@@ -274,17 +275,43 @@ export class LogTimeAction {
         // Branch doesn't exist, return empty
         return '';
       }
-      
+
       // Get the last commit message from the branch
       const { stdout } = await execAsync(
         `git log ${branchName} -1 --pretty=format:%s`
       );
-      
-      return stdout.trim();
+
+      const fullMessage = stdout.trim();
+
+      // Extract description only, removing prefix (FEAT:, FIX:, etc.) and ticket ID
+      return this.extractDescription(fullMessage, ticketId);
     } catch (error) {
       // If git command fails or any error occurs, just return empty string
       return '';
     }
+  }
+
+  /**
+   * Extract description from commit message
+   * Examples:
+   *   "FEAT: GRAP-123 do something" → "do something"
+   *   "FIX: GRAP-123 do something" → "do something"
+   *   "GRAP-123 do something" → "do something"
+   *   "do something" → "do something"
+   */
+  private extractDescription(commitMessage: string, ticketId: string): string {
+    let message = commitMessage;
+
+    // Remove commit prefix (FEAT:, FIX:, CHORE:, etc.)
+    message = message.replace(/^(FEAT|FIX|CHORE|DOCS|STYLE|REFACTOR|PERF|TEST|BUILD|CI|REVERT):\s*/i, '');
+
+    // Remove ticket ID and surrounding spaces
+    message = message.replace(new RegExp(`\\b${ticketId}\\b\\s*`, 'gi'), '');
+
+    // Clean up extra spaces
+    message = message.trim().replace(/\s+/g, ' ');
+
+    return message;
   }
 
   private showConfirmation(message: string, yes: string, no: string): Promise<boolean> {
