@@ -33,9 +33,11 @@ export class YesterdayPanel extends BasePanel {
     const tasks = state.tasks.yesterday;
 
     if (tasks.length === 0) {
-      items.push('{white-fg}No logged time yesterday{/white-fg}');
+      items.push('{gray-fg}No logged time yesterday{/gray-fg}');
       items.push('');
-      items.push('{white-fg}Tip: Press i to log time{/white-fg}');
+      items.push('{cyan-fg}💡 Actions:{/cyan-fg}');
+      items.push('{white-fg}  • Select task & press {/white-fg}{yellow-fg}i{/yellow-fg}{white-fg} to log time{/white-fg}');
+      items.push('{white-fg}  • Use {/white-fg}{yellow-fg}3{/yellow-fg}{white-fg} to jump to Todo panel{/white-fg}');
     } else {
       tasks.forEach((task) => {
         const formatted = formatTaskItem({

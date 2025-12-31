@@ -119,7 +119,8 @@ export abstract class BasePanel {
       const total = items.length;
       labelText = `${baseLabel} (${current}/${total})`;
     } else {
-      labelText = baseLabel;
+      // Still show count even when empty
+      labelText = `${baseLabel} (0)`;
     }
 
     // Use theme-consistent label styling with focus state

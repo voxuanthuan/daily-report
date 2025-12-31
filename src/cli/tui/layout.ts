@@ -147,47 +147,57 @@ export class Layout {
     return guideBar;
   }
 
-  private formatGuideBarContent(): string {
+  private formatGuideBarContent(lastSync?: Date): string {
     const theme = getTheme();
     const action = 'white-fg';   // White for action names
     const key = 'yellow-fg';     // Yellow for keyboard shortcuts
     const sep = 'gray-fg';       // Grey for separators
+    const info = 'cyan-fg';      // Cyan for info
 
-    // Guide bar format: Action: key | Action: key
-    // Similar to git staging UI style
+    // Calculate sync time
+    let syncInfo = '';
+    if (lastSync) {
+      const now = new Date();
+      const diffMs = now.getTime() - lastSync.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMins / 60);
+
+      if (diffMins < 1) {
+        syncInfo = `{${info}}✓ Synced just now{/${info}}`;
+      } else if (diffMins < 60) {
+        syncInfo = `{${info}}✓ Synced ${diffMins}m ago{/${info}}`;
+      } else {
+        syncInfo = `{${info}}✓ Synced ${diffHours}h ago{/${info}}`;
+      }
+    }
+
+    // Simplified shortcuts for space
     const shortcuts = [
-      // Navigation
-      `{${action}}Move:{/${action}} {${key}}↑↓←→/hjkl{/${key}}`,
-      // Panel navigation
-      `{${action}}Today:{/${action}} {${key}}1{/${key}}`,
-      `{${action}}Yesterday:{/${action}} {${key}}2{/${key}}`,
-      `{${action}}Todo:{/${action}} {${key}}3{/${key}}`,
-      `{${action}}Details:{/${action}} {${key}}0{/${key}}`,
-      // Actions
-      `{${action}}Open:{/${action}} {${key}}Enter{/${key}}`,
       `{${action}}LogTime:{/${action}} {${key}}i{/${key}}`,
+      `{${action}}Copy:{/${action}} {${key}}y{/${key}}`,
+      `{${action}}Title:{/${action}} {${key}}t{/${key}}`,
       `{${action}}Status:{/${action}} {${key}}s{/${key}}`,
-      // Copy
-      `{${action}}CopyTitle:{/${action}} {${key}}yy{/${key}}`,
-      `{${action}}CopyID:{/${action}} {${key}}Y{/${key}}`,
-      // Utilities
       `{${action}}Help:{/${action}} {${key}}?{/${key}}`,
       `{${action}}Refresh:{/${action}} {${key}}r{/${key}}`,
-      `{${action}}Quit:{/${action}} {${key}}q{/${key}}`,
     ];
 
-    return shortcuts.join(` {${sep}}|{/${sep}} `);
+    const shortcutsStr = shortcuts.join(` {${sep}}|{/${sep}} `);
+
+    if (syncInfo) {
+      return `${syncInfo}  {${sep}}│{/${sep}}  ${shortcutsStr}`;
+    }
+    return shortcutsStr;
   }
 
-  updateGuideBar(guideBar: blessed.Widgets.BoxElement, spinner?: string): void {
+  updateGuideBar(guideBar: blessed.Widgets.BoxElement, spinner?: string, lastSync?: Date): void {
     if (spinner) {
       // Show spinner at the start of guide bar, keep shortcuts visible
       const yellow = 'yellow-fg';
       const grey = 'gray-fg';
-      guideBar.setContent(`{${yellow}}${spinner}{/${yellow}} {${grey}}│{/${grey}} ${this.formatGuideBarContent()}`);
+      guideBar.setContent(`{${yellow}}${spinner}{/${yellow}} {${grey}}│{/${grey}} ${this.formatGuideBarContent(lastSync)}`);
     } else {
-      // Show normal guide bar
-      guideBar.setContent(this.formatGuideBarContent());
+      // Show normal guide bar with sync info
+      guideBar.setContent(this.formatGuideBarContent(lastSync));
     }
   }
   

@@ -219,32 +219,39 @@ export function getListStyle(focused: boolean): Widgets.ListOptions<any>['style'
         bg: currentTheme.selectedBg,
         fg: currentTheme.selectedFg,
         bold: true,
+        inverse: false,  // Don't inverse - use explicit bg/fg
       },
       item: {
         fg: currentTheme.fg,
+        bg: 'transparent',
       },
       border: {
         fg: currentTheme.focused,
+        bold: true,  // Make focused border bolder
       },
       focus: {
         border: {
           fg: currentTheme.focused,
+          bold: true,
         },
         selected: {
           bg: currentTheme.selectedBg,
           fg: currentTheme.selectedFg,
           bold: true,
+          inverse: false,
         },
       },
     };
   } else {
     return {
       selected: {
-        fg: currentTheme.fg,
+        fg: currentTheme.muted,  // Use muted color for unfocused selection
+        bg: 'transparent',
         bold: false,
       },
       item: {
-        fg: currentTheme.fg,
+        fg: currentTheme.dimmed,  // Dim items in unfocused panels
+        bg: 'transparent',
       },
       border: {
         fg: currentTheme.unfocused,
@@ -265,12 +272,15 @@ export function getScrollbarStyle(): { ch: string; style: { fg: string } } {
 
 /**
  * Format panel label with focus state styling
+ * Focused panels get color + bold, unfocused get dimmed
  */
 export function getPanelLabelStyle(focused: boolean, label: string): string {
   if (focused) {
-    return ` {bold}${label}{/bold} `;
+    // Use yellow (closest to Crail orange) + bold for focused panels
+    return ` {yellow-fg}{bold}${label}{/bold}{/yellow-fg} `;
   }
-  return ` ${label} `;
+  // Dim unfocused panel labels
+  return ` {gray-fg}${label}{/gray-fg} `;
 }
 
 export function getIssueIcon(issueType: string): string {

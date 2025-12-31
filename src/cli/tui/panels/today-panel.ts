@@ -33,9 +33,11 @@ export class TodayPanel extends BasePanel {
     const tasks = state.tasks.inProgress;
 
     if (tasks.length === 0) {
-      items.push('{white-fg}No tasks in progress{/white-fg}');
+      items.push('{gray-fg}No tasks in progress{/gray-fg}');
       items.push('');
-      items.push('{white-fg}Tip: Press r to refresh{/white-fg}');
+      items.push('{cyan-fg}💡 Actions:{/cyan-fg}');
+      items.push('{white-fg}  • Press {/white-fg}{yellow-fg}r{/yellow-fg}{white-fg} to refresh data{/white-fg}');
+      items.push('{white-fg}  • Go to Jira & update task status{/white-fg}');
     } else {
       tasks.forEach((task) => {
         const formatted = formatTaskItem({

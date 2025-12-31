@@ -377,4 +377,101 @@ export class LogTimeAction {
       this.screen.render();
     });
   }
+
+  /**
+   * Execute log time with description but use today's date
+   * Middle option between simple and full mode
+   */
+  async executeWithDescription(task: any): Promise<ActionResult> {
+    try {
+      if (!task) {
+        return {
+          success: false,
+          error: 'No task selected',
+        };
+      }
+
+      const key = task.key || task.id;
+      if (!key) {
+        return {
+          success: false,
+          error: 'Task has no key',
+        };
+      }
+
+      const timezone = 'Australia/Sydney';
+
+      // 1. Ask for time
+      const timeInput = await this.showPrompt(
+        `Log time for ${key}\n\nTime (e.g., 2h, 1.5h, 30m):`,
+        ''
+      );
+
+      if (!timeInput || !timeInput.trim()) {
+        return { success: false, message: 'Cancelled' };
+      }
+
+      // Parse time
+      const parsed = TimesheetParser.parseTimesheetLog(`${key} ${timeInput.trim()}`);
+      if (!parsed.isValid) {
+        return {
+          success: false,
+          error: `Invalid time format: ${parsed.errors.join(', ')}`,
+        };
+      }
+
+      // 2. Ask for description (with git auto-fill)
+      const suggestedDesc = await this.getLastCommitMessage(key);
+      const description = await this.showPrompt(
+        'Description (optional):',
+        suggestedDesc
+      );
+
+      // 3. Auto-use today
+      const targetDate = moment.tz(timezone).format('YYYY-MM-DD');
+
+      // 4. Confirm
+      const descSummary = description && description.trim() ? ` with description "${description.trim()}"` : '';
+      const confirmed = await this.showConfirmation(
+        `Log ${timeInput.trim()} to ${key} on ${targetDate}${descSummary}?`,
+        'Yes',
+        'No'
+      );
+
+      if (!confirmed) {
+        return { success: false, message: 'Cancelled' };
+      }
+
+      // 5. Submit
+      const worklogCreator = new TempoWorklogCreator(this.userAccountId, {
+        tempoApiToken: await this.configManager.getTempoApiToken(),
+        jiraServer: await this.configManager.getJiraServer(),
+        jiraAuthHeader: await this.configManager.getAuthHeader(),
+      });
+
+      const result = await worklogCreator.createWorklog(
+        task.id,
+        parsed.entries[0].timeSpentSeconds,
+        targetDate,
+        description && description.trim() ? description.trim() : undefined
+      );
+
+      if (result.success) {
+        return {
+          success: true,
+          message: `Logged ${timeInput.trim()} to ${key} on ${targetDate}${descSummary}`,
+        };
+      } else {
+        return {
+          success: false,
+          error: result.error || 'Failed to log time',
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
 }

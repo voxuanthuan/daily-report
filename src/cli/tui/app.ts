@@ -38,7 +38,6 @@ export class TUIApp {
   };
   private panelOrder: PanelType[] = ['today', 'yesterday', 'todo', 'details'];  // Navigable panels
   private helpOverlay: blessed.Widgets.BoxElement | null = null;
-  private lastYKeyTime: number = 0;
   
   // Performance optimization
   private cacheManager: CacheManager;
@@ -50,6 +49,12 @@ export class TUIApp {
     this.screen = screen;
     this.configManager = configManager;
     this.state = new StateManager();
+
+    // Set up error handler for state persistence failures
+    this.state.setErrorHandler((message, type) => {
+      this.showToast(message, type);
+    });
+
     this.layout = new Layout(screen);
     
     // Initialize performance optimizations
@@ -161,34 +166,22 @@ export class TUIApp {
     // Note: Enter/o handled by panel widgets directly
     // Note: j/k handled by panel widgets for item navigation
     // Global handlers for actions that work on selected task
-    this.screen.key(['i'], async () => {
-      await this.handleLogTime(false);
-    });
-
-    this.screen.key(['I', 'S-i'], async () => {
-      await this.handleLogTime(true);
+    this.screen.key(['i'], () => {
+      this.showLogTimeMenu();
     });
 
     this.screen.key(['s'], async () => {
       await this.handleChangeStatus();
     });
 
-    // 'yy' to copy task title - double 'y' within 500ms
+    // 'y' to show copy options menu
     this.screen.key(['y'], () => {
-      const now = Date.now();
-      if (now - this.lastYKeyTime < 500) {
-        // Double 'y' pressed
-        this.handleCopyTitle();
-        this.lastYKeyTime = 0;
-      } else {
-        // First 'y' pressed
-        this.lastYKeyTime = now;
-      }
+      this.showCopyMenu();
     });
 
-    // Shift+Y to copy ticket ID
-    this.screen.key(['Y', 'S-y'], () => {
-      this.handleCopyTicketId();
+    // 't' to quickly copy task title
+    this.screen.key(['t'], async () => {
+      await this.handleCopyTitle();
     });
 
     // 'c' to copy daily standup report
@@ -208,6 +201,19 @@ export class TUIApp {
     // 'a' to show actions menu
     this.screen.key(['a'], () => {
       this.showActionsMenu();
+    });
+
+    // Ctrl+ shortcuts for quick actions
+    this.screen.key(['C-r'], async () => {
+      await this.refresh();
+    });
+
+    this.screen.key(['C-c'], async () => {
+      await this.handleCopyReport();
+    });
+
+    this.screen.key(['C-q'], () => {
+      process.exit(0);
     });
   }
   
@@ -430,7 +436,7 @@ export class TUIApp {
     this.loadingIndicator = setInterval(() => {
       const spinner = frames[frame];
       const statusText = `{yellow-fg}${spinner} ${displayMessage}...{/yellow-fg}`;
-      this.layout.updateGuideBar(this.guideBar, statusText);
+      this.layout.updateGuideBar(this.guideBar, statusText, this.state.getState().lastRefresh || undefined);
       this.screen.render();
       frame = (frame + 1) % frames.length;
     }, 80);
@@ -443,8 +449,8 @@ export class TUIApp {
     if (this.loadingIndicator) {
       clearInterval(this.loadingIndicator);
       this.loadingIndicator = null;
-      // Restore normal guide bar
-      this.layout.updateGuideBar(this.guideBar);
+      // Restore normal guide bar with sync time
+      this.layout.updateGuideBar(this.guideBar, undefined, this.state.getState().lastRefresh || undefined);
       this.screen.render();
     }
   }
@@ -476,7 +482,37 @@ export class TUIApp {
     }
 
     const result = await this.actions.logTime.execute(task, withDateAndDescription);
-    
+
+    // Show result popup
+    if (result.success) {
+      await this.showResultPopup('✓ Success', result.message || 'Time logged successfully', 'success');
+      // Refresh data to show new worklog
+      await this.refresh();
+    } else if (result.message) {
+      this.panels.status.setMessage(result.message, 'info');
+    } else {
+      await this.showResultPopup('✗ Error', result.error || 'Failed to log time', 'error');
+    }
+  }
+
+  private async handleLogTimeWithDescription(): Promise<void> {
+    const task = this.state.getCurrentTask();
+    if (!task) {
+      this.panels.status.setMessage('No task selected', 'warning');
+      return;
+    }
+
+    // Import the LogTimeAction to access its methods
+    const LogTimeActionModule = await import('./actions/log-time.js');
+    const logTimeAction = new LogTimeActionModule.LogTimeAction(
+      this.screen,
+      this.configManager,
+      this.state.getState().user?.accountId || ''
+    );
+
+    // Create a modified version that asks for description but uses today
+    const result = await logTimeAction.executeWithDescription(task);
+
     // Show result popup
     if (result.success) {
       await this.showResultPopup('✓ Success', result.message || 'Time logged successfully', 'success');
@@ -570,7 +606,7 @@ export class TUIApp {
   private async handleCopyTitle(): Promise<void> {
     const task = this.state.getCurrentTask();
     if (!task) {
-      this.showToast('No task selected', 'error');
+      this.showToast('No task selected - use ↑↓ or hjkl to select', 'error');
       return;
     }
 
@@ -578,24 +614,63 @@ export class TUIApp {
     try {
       await this.copyToClipboard(title);
       this.showToast('Title copied!', 'success');
-    } catch {
-      this.showToast('Copy failed', 'error');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      this.showToast(`Copy failed: ${msg}. Install xclip/xsel?`, 'error');
     }
   }
 
   private handleCopyTicketId(): void {
     const task = this.state.getCurrentTask();
     if (!task) {
-      this.showToast('No task selected', 'error');
+      this.showToast('No task selected - use ↑↓ or hjkl to select', 'error');
       return;
     }
 
     const ticketId = task.key || task.id;
     this.copyToClipboard(ticketId).then(() => {
       this.showToast(`Copied: ${ticketId}`, 'success');
-    }).catch(() => {
-      this.showToast('Copy failed', 'error');
+    }).catch((error) => {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      this.showToast(`Copy failed: ${msg}. Install xclip/xsel?`, 'error');
     });
+  }
+
+  private async handleCopyDescription(): Promise<void> {
+    const task = this.state.getCurrentTask();
+    if (!task) {
+      this.showToast('No task selected - use ↑↓ or hjkl to select', 'error');
+      return;
+    }
+
+    const description = task.fields.summary;
+    try {
+      await this.copyToClipboard(description);
+      this.showToast('Description copied!', 'success');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      this.showToast(`Copy failed: ${msg}. Install xclip/xsel?`, 'error');
+    }
+  }
+
+  private async handleCopyBoth(): Promise<void> {
+    const task = this.state.getCurrentTask();
+    if (!task) {
+      this.showToast('No task selected - use ↑↓ or hjkl to select', 'error');
+      return;
+    }
+
+    const ticketId = task.key || task.id;
+    const description = task.fields.summary;
+    const fullTicket = `${ticketId}: ${description}`;
+
+    try {
+      await this.copyToClipboard(fullTicket);
+      this.showToast('Full ticket copied!', 'success');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      this.showToast(`Copy failed: ${msg}. Install xclip/xsel?`, 'error');
+    }
   }
 
   private async copyToClipboard(text: string): Promise<void> {
@@ -678,6 +753,132 @@ export class TUIApp {
     await this.refresh();
   }
 
+  private showLogTimeMenu(): void {
+    const task = this.state.getCurrentTask();
+    if (!task) {
+      this.showToast('No task selected - use ↑↓ or hjkl to select', 'error');
+      return;
+    }
+
+    const theme = getTheme();
+    const key = task.key || task.id;
+    const logTimeMenu = blessed.list({
+      parent: this.screen,
+      top: 'center',
+      left: 'center',
+      width: 50,
+      height: 9,
+      label: ` Log Time - ${key} `,
+      tags: true,
+      border: {
+        type: 'line',
+        ch: {
+          'top': '─',
+          'bottom': '─',
+          'left': '│',
+          'right': '│',
+          'tl': '╭',
+          'tr': '╮',
+          'bl': '╰',
+          'br': '╯'
+        }
+      } as any,
+      style: {
+        border: { fg: theme.primary },
+        selected: { bg: theme.primary, fg: 'white' }
+      },
+      keys: true,
+      vi: true,
+      items: [
+        '{cyan-fg}1{/cyan-fg}  Log time (quick - today only)',
+        '{cyan-fg}2{/cyan-fg}  Log time with description',
+        '{cyan-fg}3{/cyan-fg}  Log time with date & description',
+      ]
+    });
+
+    logTimeMenu.on('select', async (item, index) => {
+      logTimeMenu.detach();
+      this.screen.render();
+
+      switch(index) {
+        case 0: await this.handleLogTime(false); break;
+        case 1: await this.handleLogTimeWithDescription(); break;
+        case 2: await this.handleLogTime(true); break;
+      }
+    });
+
+    logTimeMenu.key(['escape', 'q'], () => {
+      logTimeMenu.detach();
+      this.screen.render();
+    });
+
+    logTimeMenu.focus();
+    this.screen.render();
+  }
+
+  private showCopyMenu(): void {
+    const task = this.state.getCurrentTask();
+    if (!task) {
+      this.showToast('No task selected - use ↑↓ or hjkl to select', 'error');
+      return;
+    }
+
+    const theme = getTheme();
+    const key = task.key || task.id;
+    const copyMenu = blessed.list({
+      parent: this.screen,
+      top: 'center',
+      left: 'center',
+      width: 45,
+      height: 8,
+      label: ` Copy Options - ${key} `,
+      tags: true,
+      border: {
+        type: 'line',
+        ch: {
+          'top': '─',
+          'bottom': '─',
+          'left': '│',
+          'right': '│',
+          'tl': '╭',
+          'tr': '╮',
+          'bl': '╰',
+          'br': '╯'
+        }
+      } as any,
+      style: {
+        border: { fg: theme.primary },
+        selected: { bg: theme.primary, fg: 'white' }
+      },
+      keys: true,
+      vi: true,
+      items: [
+        '{cyan-fg}1{/cyan-fg}  Copy full ticket (ID + description)',
+        '{cyan-fg}2{/cyan-fg}  Copy ticket ID only',
+        '{cyan-fg}3{/cyan-fg}  Copy description only',
+      ]
+    });
+
+    copyMenu.on('select', async (item, index) => {
+      copyMenu.detach();
+      this.screen.render();
+
+      switch(index) {
+        case 0: await this.handleCopyBoth(); break;
+        case 1: this.handleCopyTicketId(); break;
+        case 2: await this.handleCopyDescription(); break;
+      }
+    });
+
+    copyMenu.key(['escape', 'q'], () => {
+      copyMenu.detach();
+      this.screen.render();
+    });
+
+    copyMenu.focus();
+    this.screen.render();
+  }
+
   private showActionsMenu(): void {
     const task = this.state.getCurrentTask();
     if (!task) {
@@ -716,31 +917,29 @@ export class TUIApp {
       vi: true,
       items: [
         '{cyan-fg}o{/cyan-fg}  Open in browser',
-        '{cyan-fg}i{/cyan-fg}  Log time (today)',
-        '{cyan-fg}I{/cyan-fg}  Log time (with date & description)',
+        '{cyan-fg}i{/cyan-fg}  Log time (menu: quick/description/full)',
         '{cyan-fg}s{/cyan-fg}  Change status',
-        '{cyan-fg}yy{/cyan-fg} Copy task title',
-        '{cyan-fg}Y{/cyan-fg}  Copy ticket ID',
-        '{cyan-fg}c{/cyan-fg}  Copy daily report',
-        '{cyan-fg}v{/cyan-fg}  View images',
-        '{cyan-fg}r{/cyan-fg}  Refresh data',
+        '{cyan-fg}t{/cyan-fg}  Copy task title',
+        '{cyan-fg}y{/cyan-fg}  Copy menu (full/ID/description)',
+        '{cyan-fg}c{/cyan-fg}  Copy daily standup report',
+        '{cyan-fg}v{/cyan-fg}  View task images',
+        '{cyan-fg}r{/cyan-fg}  Refresh all data',
       ]
     });
 
     actionsMenu.on('select', async (item, index) => {
       actionsMenu.detach();
       this.screen.render();
-      
+
       switch(index) {
         case 0: await this.handleOpenUrl(); break;
-        case 1: await this.handleLogTime(false); break;
-        case 2: await this.handleLogTime(true); break;
-        case 3: await this.handleChangeStatus(); break;
-        case 4: await this.handleCopyTitle(); break;
-        case 5: this.handleCopyTicketId(); break;
-        case 6: await this.handleCopyReport(); break;
-        case 7: await this.panels.details.viewImages(); break;
-        case 8: await this.refresh(); break;
+        case 1: this.showLogTimeMenu(); break;
+        case 2: await this.handleChangeStatus(); break;
+        case 3: await this.handleCopyTitle(); break;
+        case 4: this.showCopyMenu(); break;
+        case 5: await this.handleCopyReport(); break;
+        case 6: await this.panels.details.viewImages(); break;
+        case 7: await this.refresh(); break;
       }
     });
 
@@ -796,22 +995,27 @@ export class TUIApp {
 
 {bold}Essential Shortcuts:{/bold}
   {cyan-fg}hjkl{/cyan-fg}   Navigate (Vim-style)
-  {cyan-fg}Enter{/cyan-fg}  Open task in browser
-  {cyan-fg}i{/cyan-fg}      Log time (today)
-  {cyan-fg}c{/cyan-fg}      Copy daily report
-  {cyan-fg}?{/cyan-fg}      Toggle this help
+  {cyan-fg}Tab{/cyan-fg}    Cycle panels
+  {cyan-fg}Enter{/cyan-fg}  Open in browser
+  {cyan-fg}i{/cyan-fg}      Log time menu
+  {cyan-fg}y{/cyan-fg}      Copy menu
+  {cyan-fg}t{/cyan-fg}      Copy title
+  {cyan-fg}c{/cyan-fg}      Copy report
+  {cyan-fg}?{/cyan-fg}      Toggle help
 
 {bold}Panel Navigation:{/bold}
   {cyan-fg}1{/cyan-fg} Today  {cyan-fg}2{/cyan-fg} Yesterday  {cyan-fg}3{/cyan-fg} Todo  {cyan-fg}0{/cyan-fg} Details
 
-{bold}Actions:{/bold}
-  {cyan-fg}s{/cyan-fg}      Change task status
-  {cyan-fg}I{/cyan-fg}      Log time with date & description
-  {cyan-fg}yy{/cyan-fg}     Copy task title
-  {cyan-fg}Y{/cyan-fg}      Copy ticket ID
-  {cyan-fg}v{/cyan-fg}      View task images
-  {cyan-fg}a{/cyan-fg}      Show actions menu
-  {cyan-fg}r{/cyan-fg}      Refresh all data
+{bold}More Actions:{/bold}
+  {cyan-fg}s{/cyan-fg}      Change status
+  {cyan-fg}v{/cyan-fg}      View images
+  {cyan-fg}a{/cyan-fg}      Actions menu
+  {cyan-fg}r{/cyan-fg}      Refresh
+  {cyan-fg}q{/cyan-fg}      Quit
+
+{bold}Quick Keys:{/bold}
+  {cyan-fg}Ctrl+R{/cyan-fg}  Quick refresh
+  {cyan-fg}Ctrl+C{/cyan-fg}  Copy report
 
 {white-fg}Press ? or ESC to close{/white-fg}
       `,

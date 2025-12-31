@@ -81,13 +81,14 @@ export class StateManager {
   private state: TUIState;
   private listeners: Set<StateListener>;
   private previousState: TUIState | null = null;
-  
+
   // Memoization caches
   private memoCache: Map<string, MemoCache<any>>;
-  
+
   // State persistence
   private persistencePath: string;
   private persistenceEnabled: boolean = true;
+  private errorHandler?: (message: string, type: 'success' | 'error' | 'info') => void;
 
   constructor() {
     this.state = {
@@ -123,6 +124,13 @@ export class StateManager {
   subscribe(listener: StateListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  /**
+   * Set error handler for state operations
+   */
+  setErrorHandler(handler: (message: string, type: 'success' | 'error' | 'info') => void): void {
+    this.errorHandler = handler;
   }
 
   /**
@@ -364,11 +372,14 @@ export class StateManager {
         lastRefresh: this.state.lastRefresh,
         timestamp: new Date().toISOString(),
       };
-      
+
       fs.writeFileSync(this.persistencePath, JSON.stringify(persistData, null, 2));
     } catch (error) {
-      // Silently fail - persistence is not critical
       console.error('Failed to persist state:', error);
+      // Notify user if error handler is set
+      if (this.errorHandler) {
+        this.errorHandler('Failed to save state', 'error');
+      }
     }
   }
 

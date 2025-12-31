@@ -30,10 +30,14 @@ export class TodoPanel extends BasePanel {
   render(): void {
     const state = this.state.getState();
     const items: string[] = [];
-    const tasks = state.tasks.open.slice(0, 10);  // Limit to 10 tasks
+    const tasks = state.tasks.open;  // Show all open tasks
 
     if (tasks.length === 0) {
-      items.push('{white-fg}No open tasks{/white-fg}');
+      items.push('{gray-fg}No open tasks{/gray-fg}');
+      items.push('');
+      items.push('{cyan-fg}💡 Actions:{/cyan-fg}');
+      items.push('{white-fg}  • Press {/white-fg}{yellow-fg}r{/yellow-fg}{white-fg} to refresh from Jira{/white-fg}');
+      items.push('{white-fg}  • Create tasks in Jira web interface{/white-fg}');
     } else {
       tasks.forEach((task) => {
         const formatted = formatTaskItem({
