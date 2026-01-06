@@ -18,12 +18,12 @@ export abstract class BasePanel {
   ) {
     this.state = state;
     this.panelType = panelType;
-    // Add icon prefix to labels
+    // Add prefix to labels
     const iconLabels: Record<PanelType, string> = {
-      today: '(1) 📅 Today',
-      todo: '(3) 📝 Todo',
-      testing: '(2) 🧪 Testing',
-      details: '(0) Details'
+      today: '[1] Report',
+      todo: '[2] Todo',
+      testing: '[3] Processing',
+      details: 'Details'
     };
     this.label = iconLabels[panelType] || label;
 
@@ -164,12 +164,12 @@ export abstract class BasePanel {
     const items = this.state.getState().panels[this.panelType].items;
     const selectedIndex = this.state.getState().panels[this.panelType].selectedIndex;
 
-    // Add icon prefix to labels
+    // Add prefix to labels - MUST match constructor labels
     const iconLabels: Record<PanelType, string> = {
-      today: '(1) 📅 Today',
-      todo: '(3) 📝 Todo',
-      testing: '(2) 🧪 Testing',
-      details: '(0) Details'
+      today: '[1] Report',
+      todo: '[2] Todo',
+      testing: '[3] Processing',
+      details: 'Details'
     };
 
     const count = items.length;

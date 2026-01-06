@@ -36,7 +36,7 @@ export class TUIApp {
     logTime: LogTimeAction;
     changeStatus: ChangeStatusAction;
   };
-  private panelOrder: PanelType[] = ['today', 'todo', 'testing', 'details'];  // Navigable panels
+  private panelOrder: PanelType[] = ['today', 'todo', 'testing'];  // Navigable panels (Details excluded)
   private helpOverlay: blessed.Widgets.BoxElement | null = null;
   
   // Performance optimization
@@ -208,6 +208,11 @@ export class TUIApp {
     });
 
     this.screen.key(['C-c'], async () => {
+      await this.handleCopyReport();
+    });
+
+    // 'c' to copy daily report
+    this.screen.key(['c'], async () => {
       await this.handleCopyReport();
     });
 

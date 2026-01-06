@@ -38,18 +38,12 @@ export class TodoPanel extends BasePanel {
       items.push('{center}{gray-fg}╭────────────────────╮{/gray-fg}{/center}');
       items.push('{center}{white-fg}│  📝 No Open Tasks  │{/white-fg}{/center}');
       items.push('{center}{gray-fg}╰────────────────────╯{/gray-fg}{/center}');
-      items.push('');
-      items.push('{center}{cyan-fg}⚡ Quick Actions{/cyan-fg}{/center}');
-      items.push('');
-      items.push('  {white-fg}r{/white-fg} {gray-fg}→{/gray-fg} {white-fg}Refresh from Jira{/white-fg}');
-      items.push('  {white-fg}1{/white-fg} {gray-fg}→{/gray-fg} {white-fg}View Today panel{/white-fg}');
-      items.push('  {white-fg}?{/white-fg} {gray-fg}→{/gray-fg} {white-fg}Show help{/white-fg}');
     } else {
       // Show all tasks (high priority tasks already have visual indicators from formatTaskItem)
       tasks.forEach((task) => {
         const key = task.key || task.id;
         const formatted = formatTaskItem({
-          key: `To - ${key}`,
+          key: key,  // Removed 'To - ' prefix
           summary: task.fields.summary,
           issuetype: task.fields?.issuetype?.name || 'Task',
           priority: task.fields?.priority?.name,

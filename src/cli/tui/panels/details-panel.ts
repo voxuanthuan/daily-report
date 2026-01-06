@@ -40,7 +40,7 @@ export class DetailsPanel {
       position.colSpan,
       blessed.box,
       {
-        label: '(0) 📋 Details',
+        label: ' Details ',
         tags: true,
         scrollable: true,
         alwaysScroll: true,
@@ -240,15 +240,14 @@ export class DetailsPanel {
 
     const content = `
 
- {bold}{white-fg}${key}{/white-fg}{/bold}
- {bold}{white-fg}${summary}{/white-fg}{/bold}
+ {gray-fg}${type}  •  ${status}{/gray-fg}
 
- {gray-fg}─────────────────────────────────────{/gray-fg}
+ {gray-fg}${key}{/gray-fg}
+ {bold}${summary}{/bold}
 
  ${formattedDescription || '{gray-fg}No description{/gray-fg}'}
- ${imageHint}
 
- {gray-fg}${getIssueIcon(type)} ${type}  •  ${getStatusIcon(status)} ${status}{/gray-fg}
+ ${imageHint}
   `.trim();
 
     this.widget.setContent(content);

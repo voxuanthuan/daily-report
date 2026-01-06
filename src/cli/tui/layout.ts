@@ -177,12 +177,11 @@ export class Layout {
     }
 
     const shortcuts = [
-      `{white-fg}LogTime:/{white-fg} {cyan-fg}i{/cyan-fg}`,
-      `{white-fg}Copy:/{white-fg} {cyan-fg}y{/cyan-fg}`,
-      `{white-fg}Title:/{white-fg} {cyan-fg}t{/cyan-fg}`,
-      `{white-fg}Status:/{white-fg} {cyan-fg}s{/cyan-fg}`,
       `{white-fg}Actions:/{white-fg} {cyan-fg}a{/cyan-fg}`,
+      `{white-fg}Copy:/{white-fg} {cyan-fg}c{/cyan-fg}`,
+      `{white-fg}LogTime:/{white-fg} {cyan-fg}i{/cyan-fg}`,
       `{white-fg}Refresh:/{white-fg} {cyan-fg}r{/cyan-fg}`,
+      `{white-fg}Status:/{white-fg} {cyan-fg}s{/cyan-fg}`,
     ];
 
     const shortcutsStr = shortcuts.join(' {gray-fg}|{/gray-fg} ');
