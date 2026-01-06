@@ -30,7 +30,7 @@ interface JiraIssue {
     tasksWithWorklogs?: TaskWithWorklogs[];
   }
 
-export async function fetchAllTasks(configManager: ConfigManager): Promise<{ inProgress: any[]; open: any[] }> {
+export async function fetchAllTasks(configManager: ConfigManager): Promise<{ inProgress: any[]; open: any[]; underReview: any[]; readyForTesting: any[] }> {
     // Check cache first
     if (taskCache && (Date.now() - taskCache.timestamp) < TASK_CACHE_TTL_MS) {
         return taskCache.data;
@@ -58,7 +58,7 @@ interface UserCache {
 }
 
 interface TaskCache {
-    data: { inProgress: any[]; open: any[] };
+    data: { inProgress: any[]; open: any[]; underReview: any[]; readyForTesting: any[] };
     timestamp: number;
 }
 
@@ -102,7 +102,7 @@ export async function fetchUserDisplayName(configManager: ConfigManager): Promis
     }
 }
 
-async function fetchBacklogTasks(configManager: ConfigManager): Promise<{ inProgress: any[]; open: any[] }> {
+async function fetchBacklogTasks(configManager: ConfigManager): Promise<{ inProgress: any[]; open: any[]; underReview: any[]; readyForTesting: any[] }> {
     const jiraUsername = await configManager.getUsername();
     const jiraServer = await configManager.getJiraServer();
     const authHeader = await configManager.getAuthHeader();
@@ -111,7 +111,7 @@ async function fetchBacklogTasks(configManager: ConfigManager): Promise<{ inProg
         'Content-Type': 'application/json'
     };
     const whoAmI = await configManager.getWhoAmI();
-    const isQC = whoAmI === IAM.QC;  const jql = `assignee = '${jiraUsername}' AND status IN ('Selected for Development', 'Open', 'In Progress')`;
+    const isQC = whoAmI === IAM.QC;  const jql = `assignee = '${jiraUsername}' AND status IN ('Selected for Development', 'Open', 'In Progress', 'Under Review', 'Code Review', 'Review', 'Ready for Testing', 'QA', 'Testing', 'To Test')`;
     const fields = ['summary', 'subtasks', 'status', 'priority', 'issuetype', 'assignee', 'description', 'comment', 'attachment'].concat(isQC ? ['parent'] : []).join(',');
     const url = `${jiraServer}rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}&expand=changelog&maxResults=100`;
 
@@ -127,10 +127,12 @@ async function fetchBacklogTasks(configManager: ConfigManager): Promise<{ inProg
         return {
             inProgress: tasksWithoutMeaningfulSubtasks.filter((task: any) => task.fields.status.name === 'In Progress'),
             open: tasksWithoutMeaningfulSubtasks.filter((task: any) => task.fields.status.name === 'Open' || task.fields.status.name === 'Selected for Development'),
+            underReview: tasksWithoutMeaningfulSubtasks.filter((task: any) => ['Under Review', 'Code Review', 'Review'].includes(task.fields.status.name)),
+            readyForTesting: tasksWithoutMeaningfulSubtasks.filter((task: any) => ['Ready for Testing', 'QA', 'Testing', 'To Test'].includes(task.fields.status.name)),
         };
     } catch (error: any) {
         console.error(`Failed to fetch backlog tasks: ${error.message}`, error.response?.data);
-        return { inProgress: [], open: [] };
+        return { inProgress: [], open: [], underReview: [], readyForTesting: [] };
     }
 }
 

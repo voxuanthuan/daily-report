@@ -70,6 +70,11 @@ export class ConfigManager {
     return format || 'YYYY-MM-DD';
   }
 
+  async getTheme(): Promise<string> {
+    const theme = await this.provider.get<string>('theme');
+    return theme || 'dark';
+  }
+
   /**
    * Get Basic Auth header for Jira API
    */

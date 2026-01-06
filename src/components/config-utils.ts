@@ -1,62 +1,58 @@
-import * as vscode from 'vscode';
-
 export const IAM = {
     DEVELOPER: "Developer",
     QC: 'QC'
-}; 
+};
 
-// Lazy configuration loading to improve startup time
-let _config: vscode.WorkspaceConfiguration | null = null;
+// Configuration cache to improve performance
 let _cachedConfig: any = {};
 let _lastConfigUpdate = 0;
 const CONFIG_CACHE_TTL = 30000; // 30 seconds
 
-function getConfig(): vscode.WorkspaceConfiguration {
+function getCachedConfigValue<T>(key: string, envVar: string, defaultValue?: T): T {
     const now = Date.now();
-    if (!_config || (now - _lastConfigUpdate) > CONFIG_CACHE_TTL) {
-        _config = vscode.workspace.getConfiguration('grappleDailyReport');
-        _cachedConfig = {}; // Reset cache
+
+    // Reset cache if TTL expired
+    if ((now - _lastConfigUpdate) > CONFIG_CACHE_TTL) {
+        _cachedConfig = {};
         _lastConfigUpdate = now;
     }
-    return _config;
-}
 
-function getCachedConfigValue<T>(key: string, defaultValue?: T): T {
     if (_cachedConfig[key] === undefined) {
-        _cachedConfig[key] = getConfig().get(key, defaultValue);
+        _cachedConfig[key] = process.env[envVar] || defaultValue;
     }
     return _cachedConfig[key];
 }
 
 export function getAutoClipboardConfig(): boolean {
-    return getCachedConfigValue('autoClipboard', true);
+    const value = getCachedConfigValue('autoClipboard', 'AUTO_CLIPBOARD', 'true');
+    return value === 'true' || value === true;
 }
 
-// Lazy getters for configuration values
+// Lazy getters for configuration values from environment variables
 export function getJiraServer(): string {
-    return getCachedConfigValue('jiraServer', '');
+    return getCachedConfigValue('jiraServer', 'JIRA_SERVER', '');
 }
 
 export function getJiraUsername(): string {
-    return getCachedConfigValue('username', '');
+    return getCachedConfigValue('username', 'JIRA_USERNAME', '');
 }
 
 export function getJiraApiToken(): string {
-    return getCachedConfigValue('apiToken', '');
+    return getCachedConfigValue('apiToken', 'JIRA_API_TOKEN', '');
 }
 
 export function getTempoApiToken(): string {
-    return getCachedConfigValue('jiraTempoToken', '');
+    return getCachedConfigValue('jiraTempoToken', 'JIRA_TEMPO_TOKEN', '');
 }
 
 export function getWhoAmI(): string {
-    return getCachedConfigValue('whoAmI', IAM.DEVELOPER);
+    return getCachedConfigValue('whoAmI', 'WHO_AM_I', IAM.DEVELOPER);
 }
 
 // Legacy exports for backward compatibility - will be removed in future versions
 // @deprecated Use getJiraServer() instead
 export const JIRA_SERVER = '';
-// @deprecated Use getJiraUsername() instead  
+// @deprecated Use getJiraUsername() instead
 export const JIRA_USERNAME = '';
 // @deprecated Use getJiraApiToken() instead
 export const JIRA_API_TOKEN = '';
@@ -93,7 +89,6 @@ export const apiHeaders = {};
 
 // Reset cache when configuration changes
 export function resetConfigCache(): void {
-    _config = null;
     _cachedConfig = {};
     _authHeader = null;
     _apiHeaders = null;

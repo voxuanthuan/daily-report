@@ -1,6 +1,6 @@
 import blessed from 'neo-blessed';
 import { StateManager } from '../state';
-import { getTheme } from '../theme';
+import { getTheme, onThemeChange } from '../theme';
 import moment from 'moment-timezone';
 
 export class TimeLogPanel {
@@ -22,7 +22,7 @@ export class TimeLogPanel {
       position.colSpan,
       blessed.box,
       {
-        label: ' Time Tracking ',
+        label: ' ⏱️  Time Tracking ',
         tags: true,
         scrollable: true,
         alwaysScroll: true,
@@ -43,16 +43,47 @@ export class TimeLogPanel {
             fg: theme.border,
           },
         },
+        padding: {
+          left: 1,
+          right: 1,
+          top: 0,
+          bottom: 0,
+        },
       }
     );
 
     this.subscribe();
+    this.setupThemeListener();
   }
 
   private subscribe(): void {
     this.state.subscribe(() => {
       this.render();
     });
+  }
+
+  private setupThemeListener(): void {
+    onThemeChange(() => {
+      this.updateTheme();
+    });
+  }
+
+  private updateTheme(): void {
+    const theme = getTheme();
+    
+    // Explicitly update all style properties
+    if (this.widget.style) {
+      // Update border color
+      if (this.widget.style.border) {
+        this.widget.style.border.fg = theme.border;
+      }
+      
+      // Update foreground color only - background is transparent
+      this.widget.style.fg = theme.fg;
+    }
+    
+    this.render();
+    this.widget.screen.render();
   }
 
   render(): void {
@@ -108,15 +139,16 @@ export class TimeLogPanel {
       const hourStr = hours.toFixed(1).padStart(5) + 'h';
       const dayLabel = isToday ? `{bold}{underline}${day}{/underline}{/bold}` : day;
       const bar = this.getEnhancedProgressBar(hours, 8, 15);
+      const goalIndicator = hours < 8 ? ' {gray-fg}│{/gray-fg}' : '';
 
       if (isToday) {
-        lines.push(`  ${dayLabel} ${hourStr} ${bar} {cyan-fg}<{/cyan-fg}`);
+        lines.push(`  ${dayLabel} ${hourStr} ${bar} {cyan-fg}<{/cyan-fg}${goalIndicator}`);
       } else if (hours >= 8) {
         lines.push(`  ${dayLabel} ${hourStr} ${bar} {green-fg}✓{/green-fg}`);
       } else if (hours > 0) {
-        lines.push(`  ${dayLabel} ${hourStr} ${bar}`);
+        lines.push(`  ${dayLabel} ${hourStr} ${bar}${goalIndicator}`);
       } else {
-        lines.push(`  {white-fg}${day} ${hourStr} ${bar}{/white-fg}`);
+        lines.push(`  {white-fg}${day} ${hourStr} ${bar}{/white-fg}${goalIndicator}`);
       }
     });
 
@@ -149,9 +181,22 @@ export class TimeLogPanel {
     const percentage = Math.min(hours / target, 1);
     const filledWidth = Math.round(percentage * width);
 
-    // Use different characters for visual appeal
-    const filled = '\u2588'.repeat(filledWidth);     // Full block
-    const empty = '\u2591'.repeat(width - filledWidth); // Light shade
+    // Use different characters for visual appeal (░, ▒, ▓, █)
+    let filled = '';
+    const remaining = width - filledWidth;
+
+    // Determine shading based on progress percentage
+    if (percentage >= 0.75) {
+      filled = '\u2588'.repeat(filledWidth);     // Full block ▓█
+    } else if (percentage >= 0.5) {
+      filled = '\u2593'.repeat(filledWidth);     // Dark shade ▓
+    } else if (percentage >= 0.25) {
+      filled = '\u2592'.repeat(filledWidth);     // Medium shade ▒
+    } else {
+      filled = '\u2591'.repeat(filledWidth);     // Light shade ░
+    }
+
+    const empty = '\u2591'.repeat(remaining);    // Light shade for empty space
 
     let color = 'gray';
     if (hours >= target) {

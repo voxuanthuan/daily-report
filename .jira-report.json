@@ -6,5 +6,6 @@
   "whoAmI": "Developer",
   "autoClipboard": true,
   "enableTimesheetIntegration": true,
-  "timesheetDateFormat": "YYYY-MM-DD"
+  "timesheetDateFormat": "YYYY-MM-DD",
+  "theme": "solarized"
 }

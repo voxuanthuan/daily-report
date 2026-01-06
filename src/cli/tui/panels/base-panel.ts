@@ -1,6 +1,6 @@
 import blessed from 'neo-blessed';
 import { StateManager, PanelType } from '../state';
-import { getListStyle, getTheme, getScrollbarStyle, getPanelLabelStyle } from '../theme';
+import { getListStyle, getTheme, getScrollbarStyle, getPanelLabelStyle, onThemeChange } from '../theme';
 
 export abstract class BasePanel {
   protected widget: blessed.Widgets.ListElement;
@@ -18,7 +18,14 @@ export abstract class BasePanel {
   ) {
     this.state = state;
     this.panelType = panelType;
-    this.label = label;
+    // Add icon prefix to labels
+    const iconLabels: Record<PanelType, string> = {
+      today: '(1) 📅 Today',
+      todo: '(3) 📝 Todo',
+      testing: '(2) 🧪 Testing',
+      details: '(0) Details'
+    };
+    this.label = iconLabels[panelType] || label;
 
     const theme = getTheme();
 
@@ -29,7 +36,7 @@ export abstract class BasePanel {
       position.colSpan,
       blessed.list,
       {
-        label: ` ${label} `,
+        label: getPanelLabelStyle(false, this.label),  // Use styled label (initially unfocused)
         tags: true,
         keys: true,
         vi: true,
@@ -41,11 +48,18 @@ export abstract class BasePanel {
         },
         scrollbar: getScrollbarStyle(),
         style: getListStyle(false),
+        padding: {
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+        },
       }
     );
 
     this.setupKeyHandlers();
     this.subscribe();
+    this.setupThemeListener();
   }
 
   protected setupKeyHandlers(): void {
@@ -106,6 +120,12 @@ export abstract class BasePanel {
     });
   }
 
+  protected setupThemeListener(): void {
+    onThemeChange(() => {
+      this.updateTheme();
+    });
+  }
+
   /**
    * Update panel label with position indicator (e.g., "TODAY (2/5)")
    */
@@ -113,18 +133,92 @@ export abstract class BasePanel {
     const items = this.state.getState().panels[this.panelType].items;
     const selectedIndex = this.state.getState().panels[this.panelType].selectedIndex;
 
+    // Add icon prefix to labels
+    const iconLabels: Record<PanelType, string> = {
+      today: '(1) 📅 Today',
+      todo: '(3) 📝 Todo',
+      testing: '(2) 🧪 Testing',
+      details: '(0) Details'
+    };
+
     let labelText: string;
     if (items.length > 0) {
       const current = selectedIndex + 1;
       const total = items.length;
-      labelText = `${baseLabel} (${current}/${total})`;
+      labelText = `${iconLabels[this.panelType]} (${current}/${total})`;
     } else {
       // Still show count even when empty
-      labelText = `${baseLabel} (0)`;
+      labelText = `${iconLabels[this.panelType]} (0)`;
     }
 
     // Use theme-consistent label styling with focus state
     this.widget.setLabel(getPanelLabelStyle(this.focused, labelText));
+  }
+
+  /**
+   * Update panel label with custom statistics (e.g., task count, time logged)
+   * @param baseLabel - Base label without icons
+   * @param stats - Optional statistics to show (e.g., " • 6h")
+   */
+  protected updateLabelWithStats(baseLabel: string, stats?: string): void {
+    const items = this.state.getState().panels[this.panelType].items;
+    const selectedIndex = this.state.getState().panels[this.panelType].selectedIndex;
+
+    // Add icon prefix to labels
+    const iconLabels: Record<PanelType, string> = {
+      today: '(1) 📅 Today',
+      todo: '(3) 📝 Todo',
+      testing: '(2) 🧪 Testing',
+      details: '(0) Details'
+    };
+
+    const count = items.length;
+    let labelText = `${iconLabels[this.panelType]} (${count})`;
+    
+    // Add statistics if provided
+    if (stats) {
+      labelText += stats;
+    }
+
+    // Use theme-consistent label styling with focus state
+    this.widget.setLabel(getPanelLabelStyle(this.focused, labelText));
+  }
+
+  protected updateTheme(): void {
+    const newStyle = getListStyle(this.focused);
+    const theme = getTheme();
+    
+    // Explicitly update all style properties for blessed to recognize changes
+    if (this.widget.style) {
+      // Update border color
+      if (this.widget.style.border) {
+        this.widget.style.border.fg = newStyle.border.fg;
+      }
+      
+      // Update foreground (text) color
+      this.widget.style.fg = newStyle.fg;
+      
+      // Background is transparent - not set
+      
+      // Update selected item colors
+      if (this.widget.style.selected) {
+        this.widget.style.selected.fg = newStyle.selected.fg;
+        this.widget.style.selected.bg = newStyle.selected.bg;
+      }
+      
+      // Update item colors
+      if (this.widget.style.item) {
+        this.widget.style.item.fg = newStyle.item.fg;
+        this.widget.style.item.bg = newStyle.item.bg;
+      }
+    }
+
+    // Update label with theme-aware styling
+    this.widget.setLabel(getPanelLabelStyle(this.focused, this.label));
+    
+    // Re-render to apply changes
+    this.render();
+    this.widget.screen.render();
   }
 
   protected subscribe(): void {

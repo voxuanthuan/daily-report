@@ -45,13 +45,13 @@ export interface PanelState {
   items: any[];
 }
 
-export type PanelType = 'today' | 'yesterday' | 'todo' | 'details';
+export type PanelType = 'today' | 'todo' | 'testing' | 'details';
 
 export interface TUIState {
   panels: {
     today: PanelState;
-    yesterday: PanelState;
     todo: PanelState;
+    testing: PanelState;
     details: PanelState;
   };
   focusedPanel: PanelType;
@@ -59,6 +59,8 @@ export interface TUIState {
     inProgress: JiraIssue[];
     open: JiraIssue[];
     yesterday: JiraIssue[];
+    underReview: JiraIssue[];
+    readyForTesting: JiraIssue[];
   };
   tasksWithWorklogs: TaskWithWorklogs[];
   worklogs: Worklog[];
@@ -66,6 +68,7 @@ export interface TUIState {
   loading: boolean;
   statusMessage: string;
   lastRefresh: Date | null;
+  themeMode: string;
 }
 
 // Selective listener for specific state changes
@@ -94,8 +97,8 @@ export class StateManager {
     this.state = {
       panels: {
         today: { selectedIndex: 0, scrollOffset: 0, items: [] },
-        yesterday: { selectedIndex: 0, scrollOffset: 0, items: [] },
         todo: { selectedIndex: 0, scrollOffset: 0, items: [] },
+        testing: { selectedIndex: 0, scrollOffset: 0, items: [] },
         details: { selectedIndex: 0, scrollOffset: 0, items: [] },
       },
       focusedPanel: 'today',
@@ -103,6 +106,8 @@ export class StateManager {
         inProgress: [],
         open: [],
         yesterday: [],
+        underReview: [],
+        readyForTesting: [],
       },
       tasksWithWorklogs: [],
       worklogs: [],
@@ -110,6 +115,7 @@ export class StateManager {
       loading: false,
       statusMessage: 'Ready',
       lastRefresh: null,
+      themeMode: 'dark',
     };
     this.listeners = new Set();
     this.memoCache = new Map();
@@ -178,6 +184,10 @@ export class StateManager {
     if (this.state.statusMessage !== this.previousState.statusMessage) {
       changed.add('statusMessage');
     }
+
+    if (this.state.themeMode !== this.previousState.themeMode) {
+      changed.add('themeMode');
+    }
     
     // Check panels (by reference or deep comparison)
     (Object.keys(this.state.panels) as PanelType[]).forEach(panel => {
@@ -236,6 +246,16 @@ export class StateManager {
     this.notify(new Set(['tasks.yesterday']));
   }
 
+  updateUnderReviewTasks(tasks: JiraIssue[]): void {
+    this.state.tasks.underReview = tasks;
+    this.notify(new Set(['tasks.underReview']));
+  }
+
+  updateReadyForTestingTasks(tasks: JiraIssue[]): void {
+    this.state.tasks.readyForTesting = tasks;
+    this.notify(new Set(['tasks.readyForTesting']));
+  }
+
   updateTasksWithWorklogs(tasksWithWorklogs: TaskWithWorklogs[]): void {
     this.state.tasksWithWorklogs = tasksWithWorklogs;
     this.notify(new Set(['tasksWithWorklogs']));
@@ -271,6 +291,15 @@ export class StateManager {
     this.notify(new Set(['lastRefresh']));
   }
 
+  setThemeMode(mode: string): void {
+    this.state.themeMode = mode;
+    this.notify(new Set(['themeMode']));
+  }
+
+  getThemeMode(): string {
+    return this.state.themeMode;
+  }
+
   getSelectedItem(panel: PanelType): any {
     const panelState = this.state.panels[panel];
     if (panelState.selectedIndex >= 0 && panelState.selectedIndex < panelState.items.length) {
@@ -281,7 +310,7 @@ export class StateManager {
 
   getCurrentTask(): JiraIssue | null {
     const panel = this.state.focusedPanel;
-    if (panel === 'today' || panel === 'yesterday' || panel === 'todo') {
+    if (panel === 'today' || panel === 'testing' || panel === 'todo') {
       return this.getSelectedItem(panel);
     }
     return null;
@@ -370,6 +399,7 @@ export class StateManager {
         focusedPanel: this.state.focusedPanel,
         panels: this.state.panels,
         lastRefresh: this.state.lastRefresh,
+        themeMode: this.state.themeMode,
         timestamp: new Date().toISOString(),
       };
 
@@ -402,6 +432,7 @@ export class StateManager {
       
       if (hoursDiff < 24) {
         this.state.focusedPanel = persistData.focusedPanel || this.state.focusedPanel;
+        this.state.themeMode = persistData.themeMode || this.state.themeMode;
         // Don't restore panel items, only positions
         Object.keys(persistData.panels || {}).forEach((panel) => {
           const panelKey = panel as PanelType;

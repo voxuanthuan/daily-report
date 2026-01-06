@@ -53,6 +53,7 @@ export class CLIConfigProvider implements IConfigProvider {
       autoClipboard: process.env.AUTO_CLIPBOARD === 'true' || this.config.autoClipboard !== false,
       enableTimesheetIntegration: this.config.enableTimesheetIntegration !== false,
       timesheetDateFormat: this.config.timesheetDateFormat || 'YYYY-MM-DD',
+      theme: process.env.THEME || this.config.theme || 'solarized',
     };
 
     this.initialized = true;
@@ -104,6 +105,7 @@ export class CLIConfigProvider implements IConfigProvider {
       jiraTempoToken: 'TEMPO_API_TOKEN',
       whoAmI: 'WHO_AM_I',
       autoClipboard: 'AUTO_CLIPBOARD',
+      theme: 'THEME',
     };
     return envMap[key] || key.toUpperCase();
   }
@@ -136,7 +138,8 @@ export class CLIConfigProvider implements IConfigProvider {
       whoAmI: 'Developer',
       autoClipboard: true,
       enableTimesheetIntegration: true,
-      timesheetDateFormat: 'YYYY-MM-DD'
+      timesheetDateFormat: 'YYYY-MM-DD',
+      theme: 'dark'
     };
 
     fs.writeFileSync(targetPath, JSON.stringify(template, null, 2), 'utf-8');

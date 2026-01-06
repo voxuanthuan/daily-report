@@ -3,7 +3,7 @@ import { ConfigManager } from '../../core/config';
 import { StateManager, PanelType } from './state';
 import { Layout } from './layout';
 import { TodayPanel } from './panels/today-panel';
-import { YesterdayPanel } from './panels/yesterday-panel';
+import { TestingPanel } from './panels/testing-panel';
 import { TodoPanel } from './panels/todo-panel';
 import { DetailsPanel } from './panels/details-panel';
 import { StatusPanel } from './panels/status-panel';
@@ -14,7 +14,7 @@ import { ChangeStatusAction } from './actions/change-status';
 import { fetchAllTasks, fetchUserDisplayName, extractPreviousWorkdayTasks, clearCaches } from '../../core/task-fetcher';
 import TempoFetcher from '../../core/tempo/fetcher';
 import { CacheManager, RequestDeduplicator, debounce } from './utils/cache';
-import { getTheme } from './theme';
+import { getTheme, setTheme, getCurrentThemeMode, onThemeChange, ThemeMode } from './theme';
 import { applyRoundedCorners } from './utils/rounded-corners';
 
 export class TUIApp {
@@ -24,7 +24,7 @@ export class TUIApp {
   private layout: Layout;
   private panels: {
     today: TodayPanel;
-    yesterday: YesterdayPanel;
+    testing: TestingPanel;
     todo: TodoPanel;
     details: DetailsPanel;
     status: StatusPanel;
@@ -36,7 +36,7 @@ export class TUIApp {
     logTime: LogTimeAction;
     changeStatus: ChangeStatusAction;
   };
-  private panelOrder: PanelType[] = ['today', 'yesterday', 'todo', 'details'];  // Navigable panels
+  private panelOrder: PanelType[] = ['today', 'todo', 'testing', 'details'];  // Navigable panels
   private helpOverlay: blessed.Widgets.BoxElement | null = null;
   
   // Performance optimization
@@ -73,10 +73,10 @@ export class TUIApp {
         this.layout.positions.todayPanel,
         this.handleTaskSelect.bind(this)
       ),
-      yesterday: new YesterdayPanel(
+      testing: new TestingPanel(
         grid,
         this.state,
-        this.layout.positions.yesterdayPanel,
+        this.layout.positions.testingPanel,
         this.handleTaskSelect.bind(this)
       ),
       todo: new TodoPanel(
@@ -104,7 +104,7 @@ export class TUIApp {
 
     // Apply rounded corners to all panels
     applyRoundedCorners(this.panels.today.getWidget());
-    applyRoundedCorners(this.panels.yesterday.getWidget());
+    applyRoundedCorners(this.panels.testing.getWidget());
     applyRoundedCorners(this.panels.todo.getWidget());
     applyRoundedCorners(this.panels.details.getWidget());
     applyRoundedCorners(this.panels.timelog.getWidget());
@@ -120,11 +120,8 @@ export class TUIApp {
   }
 
   private setupGlobalKeys(): void {
-    // Vim-style navigation: h/l for panel left/right
-    this.screen.key(['h'], () => {
-      this.navigateToPreviousPanel();
-    });
-
+    // Vim-style navigation: l for panel right, h for left panel navigation
+    // Note: h now free for Ctrl+? help toggle
     this.screen.key(['l'], () => {
       this.navigateToNextPanel();
     });
@@ -138,17 +135,22 @@ export class TUIApp {
       this.navigateToPreviousPanel();
     });
 
+    // Ctrl+? to toggle help (replaces Ctrl+H to avoid conflict with h key)
+    this.screen.key(['C-?'], () => {
+      this.toggleHelp();
+    });
+
     // Number shortcuts for panels
     this.screen.key(['1'], () => {
       this.state.setFocusedPanel('today');
     });
 
     this.screen.key(['2'], () => {
-      this.state.setFocusedPanel('yesterday');
+      this.state.setFocusedPanel('todo');
     });
 
     this.screen.key(['3'], () => {
-      this.state.setFocusedPanel('todo');
+      this.state.setFocusedPanel('testing');
     });
 
     this.screen.key(['0'], () => {
@@ -159,7 +161,7 @@ export class TUIApp {
       await this.refresh();
     });
 
-    this.screen.key(['?'], () => {
+    this.screen.key(['C-h'], () => {
       this.toggleHelp();
     });
 
@@ -179,15 +181,7 @@ export class TUIApp {
       this.showCopyMenu();
     });
 
-    // 't' to quickly copy task title
-    this.screen.key(['t'], async () => {
-      await this.handleCopyTitle();
-    });
 
-    // 'c' to copy daily standup report
-    this.screen.key(['c'], async () => {
-      await this.handleCopyReport();
-    });
 
     // 'v' to view images (works from any panel if task has images)
     this.screen.key(['v'], async () => {
@@ -198,9 +192,14 @@ export class TUIApp {
       }
     });
 
-    // 'a' to show actions menu
-    this.screen.key(['a'], () => {
+    // 'a' or '/' to show actions menu (help)
+    this.screen.key(['a', '/'], () => {  // Using / instead of ? for better compatibility
       this.showActionsMenu();
+    });
+
+    // h for left panel navigation (now unconflicted with help toggle)
+    this.screen.key(['h'], () => {
+      this.navigateToPreviousPanel();
     });
 
     // Ctrl+ shortcuts for quick actions
@@ -215,6 +214,8 @@ export class TUIApp {
     this.screen.key(['C-q'], () => {
       process.exit(0);
     });
+
+
   }
   
   /**
@@ -230,8 +231,8 @@ export class TUIApp {
             this.renderAllPanels();
           } else if (key.startsWith('panels.today')) {
             this.panels.today.render();
-          } else if (key.startsWith('panels.yesterday')) {
-            this.panels.yesterday.render();
+          } else if (key.startsWith('panels.testing')) {
+            this.panels.testing.render();
           } else if (key.startsWith('panels.todo')) {
             this.panels.todo.render();
           } else if (key.startsWith('panels.details')) {
@@ -243,9 +244,14 @@ export class TUIApp {
           }
         });
       }
-      
+
       // Use debounced render
       this.debouncedRender();
+    });
+
+    // Subscribe to theme changes for UI updates
+    onThemeChange(() => {
+      this.updateTheme();
     });
   }
 
@@ -266,6 +272,7 @@ export class TUIApp {
 
   async initialize(): Promise<void> {
     try {
+      await this.loadThemeFromConfig();
       await this.loadInitialData();
       this.state.setFocusedPanel('today');
       this.renderAllPanels();
@@ -275,6 +282,16 @@ export class TUIApp {
         `Error initializing: ${error instanceof Error ? error.message : String(error)}`,
         'error'
       );
+    }
+  }
+
+  private async loadThemeFromConfig(): Promise<void> {
+    try {
+      const themeMode = await this.configManager.getTheme();
+      setTheme(themeMode as any);
+      this.state.setThemeMode(themeMode);
+    } catch (error) {
+      console.warn('Failed to load theme from config, using default:', error);
     }
   }
 
@@ -302,6 +319,8 @@ export class TUIApp {
 
       this.state.updateUser(user);
       this.state.updateTasks(tasks);
+      this.state.updateUnderReviewTasks(tasks.underReview || []);
+      this.state.updateReadyForTestingTasks(tasks.readyForTesting || []);
 
       this.actions.logTime = new LogTimeAction(
         this.screen,
@@ -352,7 +371,7 @@ export class TUIApp {
 
   private renderAllPanels(): void {
     this.panels.today.render();
-    this.panels.yesterday.render();
+    this.panels.testing.render();
     this.panels.todo.render();
     this.panels.details.render();
     this.panels.status.render();
@@ -785,7 +804,14 @@ export class TUIApp {
       } as any,
       style: {
         border: { fg: theme.primary },
-        selected: { bg: theme.primary, fg: 'white' }
+        selected: { 
+          bg: theme.selectedBg,
+          fg: theme.selectedFg,
+          bold: true 
+        },
+        item: {
+          fg: theme.fg
+        }
       },
       keys: true,
       vi: true,
@@ -848,7 +874,14 @@ export class TUIApp {
       } as any,
       style: {
         border: { fg: theme.primary },
-        selected: { bg: theme.primary, fg: 'white' }
+        selected: { 
+          bg: theme.selectedBg,
+          fg: theme.selectedFg,
+          bold: true 
+        },
+        item: {
+          fg: theme.fg
+        }
       },
       keys: true,
       vi: true,
@@ -911,7 +944,14 @@ export class TUIApp {
       } as any,
       style: {
         border: { fg: theme.primary },
-        selected: { bg: theme.primary, fg: 'white' }
+        selected: { 
+          bg: theme.selectedBg,  // Dark subtle background
+          fg: theme.selectedFg,  // Yellow/accent text
+          bold: true 
+        },
+        item: {
+          fg: theme.fg  // Normal text color
+        }
       },
       keys: true,
       vi: true,
@@ -919,7 +959,6 @@ export class TUIApp {
         '{cyan-fg}o{/cyan-fg}  Open in browser',
         '{cyan-fg}i{/cyan-fg}  Log time (menu: quick/description/full)',
         '{cyan-fg}s{/cyan-fg}  Change status',
-        '{cyan-fg}t{/cyan-fg}  Copy task title',
         '{cyan-fg}y{/cyan-fg}  Copy menu (full/ID/description)',
         '{cyan-fg}c{/cyan-fg}  Copy daily standup report',
         '{cyan-fg}v{/cyan-fg}  View task images',
@@ -935,11 +974,10 @@ export class TUIApp {
         case 0: await this.handleOpenUrl(); break;
         case 1: this.showLogTimeMenu(); break;
         case 2: await this.handleChangeStatus(); break;
-        case 3: await this.handleCopyTitle(); break;
-        case 4: this.showCopyMenu(); break;
-        case 5: await this.handleCopyReport(); break;
-        case 6: await this.panels.details.viewImages(); break;
-        case 7: await this.refresh(); break;
+        case 3: this.showCopyMenu(); break;
+        case 4: await this.handleCopyReport(); break;
+        case 5: await this.panels.details.viewImages(); break;
+        case 6: await this.refresh(); break;
       }
     });
 
@@ -994,17 +1032,16 @@ export class TUIApp {
 {bold}Jira Daily Report - Quick Reference{/bold}
 
 {bold}Essential Shortcuts:{/bold}
-  {cyan-fg}hjkl{/cyan-fg}   Navigate (Vim-style)
-  {cyan-fg}Tab{/cyan-fg}    Cycle panels
+  {cyan-fg}jkl{/cyan-fg}      Navigate (Vim-style)
+  {cyan-fg}Tab{/cyan-fg}      Cycle panels
   {cyan-fg}Enter{/cyan-fg}  Open in browser
   {cyan-fg}i{/cyan-fg}      Log time menu
   {cyan-fg}y{/cyan-fg}      Copy menu
-  {cyan-fg}t{/cyan-fg}      Copy title
   {cyan-fg}c{/cyan-fg}      Copy report
-  {cyan-fg}?{/cyan-fg}      Toggle help
+  {cyan-fg}Ctrl+?{/cyan-fg}   Toggle help
 
 {bold}Panel Navigation:{/bold}
-  {cyan-fg}1{/cyan-fg} Today  {cyan-fg}2{/cyan-fg} Yesterday  {cyan-fg}3{/cyan-fg} Todo  {cyan-fg}0{/cyan-fg} Details
+  {cyan-fg}1{/cyan-fg} Today  {cyan-fg}2{/cyan-fg} Testing  {cyan-fg}3{/cyan-fg} Todo  {cyan-fg}0{/cyan-fg} Details
 
 {bold}More Actions:{/bold}
   {cyan-fg}s{/cyan-fg}      Change status
@@ -1014,14 +1051,15 @@ export class TUIApp {
   {cyan-fg}q{/cyan-fg}      Quit
 
 {bold}Quick Keys:{/bold}
+  {cyan-fg}Ctrl+T{/cyan-fg}  Change theme
   {cyan-fg}Ctrl+R{/cyan-fg}  Quick refresh
   {cyan-fg}Ctrl+C{/cyan-fg}  Copy report
 
-{white-fg}Press ? or ESC to close{/white-fg}
+{white-fg}Press Ctrl+? or ESC to close{/white-fg}
       `,
     });
 
-    this.helpOverlay.key(['?', 'escape'], () => {
+    this.helpOverlay.key(['C-?', 'escape'], () => {
       this.toggleHelp();
     });
 
@@ -1032,5 +1070,16 @@ export class TUIApp {
   cleanup(): void {
     this.hideLoadingIndicator();
     this.screen.destroy();
+  }
+
+  private updateTheme(): void {
+    const theme = getTheme();
+    
+    // Apply theme background to screen
+    const { applyBackgroundToScreen } = require('./theme');
+    applyBackgroundToScreen(this.screen, theme);
+    
+    this.layout.updateGuideBar(this.guideBar, undefined, this.state.getState().lastRefresh || undefined);
+    this.renderAllPanels();
   }
 }

@@ -23,7 +23,7 @@ export class TodoPanel extends BasePanel {
     position: { row: number; col: number; rowSpan: number; colSpan: number },
     onSelectCallback?: (task: any) => Promise<void>
   ) {
-    super(grid, state, 'todo', position, '(3) Todo');
+    super(grid, state, 'todo', position, '');
     this.onSelectCallback = onSelectCallback;
   }
 
@@ -32,16 +32,24 @@ export class TodoPanel extends BasePanel {
     const items: string[] = [];
     const tasks = state.tasks.open;  // Show all open tasks
 
+    // Enhanced empty state
     if (tasks.length === 0) {
-      items.push('{gray-fg}No open tasks{/gray-fg}');
       items.push('');
-      items.push('{cyan-fg}💡 Actions:{/cyan-fg}');
-      items.push('{white-fg}  • Press {/white-fg}{yellow-fg}r{/yellow-fg}{white-fg} to refresh from Jira{/white-fg}');
-      items.push('{white-fg}  • Create tasks in Jira web interface{/white-fg}');
+      items.push('{center}{gray-fg}╭────────────────────╮{/gray-fg}{/center}');
+      items.push('{center}{white-fg}│  📝 No Open Tasks  │{/white-fg}{/center}');
+      items.push('{center}{gray-fg}╰────────────────────╯{/gray-fg}{/center}');
+      items.push('');
+      items.push('{center}{cyan-fg}⚡ Quick Actions{/cyan-fg}{/center}');
+      items.push('');
+      items.push('  {white-fg}r{/white-fg} {gray-fg}→{/gray-fg} {white-fg}Refresh from Jira{/white-fg}');
+      items.push('  {white-fg}1{/white-fg} {gray-fg}→{/gray-fg} {white-fg}View Today panel{/white-fg}');
+      items.push('  {white-fg}?{/white-fg} {gray-fg}→{/gray-fg} {white-fg}Show help{/white-fg}');
     } else {
+      // Show all tasks (high priority tasks already have visual indicators from formatTaskItem)
       tasks.forEach((task) => {
+        const key = task.key || task.id;
         const formatted = formatTaskItem({
-          key: task.key || task.id,
+          key: `To - ${key}`,
           summary: task.fields.summary,
           issuetype: task.fields?.issuetype?.name || 'Task',
           priority: task.fields?.priority?.name,
@@ -66,8 +74,8 @@ export class TodoPanel extends BasePanel {
       this.widget.select(validIndex);
     }
 
-    // Update label with position indicator
-    this.updateLabelWithPosition('(3) Todo');
+    // Update label with task count
+    this.updateLabelWithStats('Todo');
 
     this.widget.screen.render();
   }

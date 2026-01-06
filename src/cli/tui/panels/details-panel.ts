@@ -1,7 +1,8 @@
 import blessed from 'neo-blessed';
 import { StateManager } from '../state';
-import { getIssueIcon, getStatusIcon, getStatusColor, getPriorityIcon, getPriorityColor, formatSectionHeader, getScrollbarStyle, getTheme } from '../theme';
+import { getIssueIcon, getStatusIcon, getStatusColor, getPriorityIcon, getPriorityColor, formatSectionHeader, getScrollbarStyle, getTheme, onThemeChange } from '../theme';
 import { ConfigManager } from '../../../core/config';
+import { getJiraServer } from '../../../components/config-utils';
 
 interface JiraIssue {
   id: string;
@@ -39,7 +40,7 @@ export class DetailsPanel {
       position.colSpan,
       blessed.box,
       {
-        label: '(0) Details',
+        label: '(0) 📋 Details',
         tags: true,
         scrollable: true,
         alwaysScroll: true,
@@ -55,11 +56,18 @@ export class DetailsPanel {
             fg: getTheme().border,
           },
         },
+        padding: {
+          left: 1,
+          right: 1,
+          top: 1,     // Add top padding for spacing
+          bottom: 0,
+        },
       }
     );
 
     this.setupKeyHandlers();
     this.subscribe();
+    this.setupThemeListener();
   }
 
   /**
@@ -117,6 +125,30 @@ export class DetailsPanel {
     this.widget.key(['i'], async () => {
       await this.openImages();
     });
+  }
+
+  private setupThemeListener(): void {
+    onThemeChange(() => {
+      this.updateTheme();
+    });
+  }
+
+  private updateTheme(): void {
+    const theme = getTheme();
+    
+    // Explicitly update all style properties
+    if (this.widget.style) {
+      // Update border color
+      if (this.widget.style.border) {
+        this.widget.style.border.fg = theme.border;
+      }
+      
+      // Update foreground color only - background is transparent
+      this.widget.style.fg = theme.fg;
+    }
+    
+    this.render();
+    this.widget.screen.render();
   }
 
   private async openImages(): Promise<void> {
@@ -194,14 +226,8 @@ export class DetailsPanel {
     const key = task.key || task.id;
     const type = task.fields?.issuetype?.name || 'Task';
     const status = task.fields?.status?.name || 'Unknown';
-    const priority = task.fields?.priority?.name || 'Medium';
-    const assignee = task.fields?.assignee?.displayName || 'Unassigned';
     const summary = task.fields.summary;
     const rawDescription = task.fields.description;
-
-    // Get Jira server URL
-    const jiraServer = this.configManager.getJiraServer();
-    const url = `${jiraServer}browse/${key}`;
 
     // Parse and format description (handle ADF format)
     const description = this.parseDescription(rawDescription);
@@ -210,29 +236,20 @@ export class DetailsPanel {
     const imageCount = this.imageUrls.length;
     const isKitty = process.env.TERM === 'xterm-kitty' || process.env.KITTY_WINDOW_ID;
     const imageAction = isKitty ? 'show in terminal' : 'open in browser';
-    const imageHint = imageCount > 0 ? `\n{white-fg}(Press 'i' to ${imageAction} ${imageCount} image${imageCount > 1 ? 's' : ''}){/white-fg}` : '';
-
-    // Get recent time logs for this task
-    const recentTimeLogs = this.getRecentTimeLogsForTask(key);
+    const imageHint = imageCount > 0 ? `{gray-fg}(Press 'v' to ${imageAction} ${imageCount} image${imageCount > 1 ? 's' : ''}){/gray-fg}` : '';
 
     const content = `
-${formatSectionHeader('Task Info', 50)}
-{bold}${key}{/bold}: ${summary}
 
-{cyan-fg}Type:{/cyan-fg}     ${getIssueIcon(type)} ${type}
-{cyan-fg}Status:{/cyan-fg}   ${this.formatStatusBadge(status)}
-{cyan-fg}Priority:{/cyan-fg} ${this.formatPriorityBadge(priority)}
-{cyan-fg}Assignee:{/cyan-fg} ${assignee}
+ {bold}{white-fg}${key}{/white-fg}{/bold}
+ {bold}{white-fg}${summary}{/white-fg}{/bold}
 
-${formatSectionHeader('Description', 50)}${imageHint}
-${formattedDescription || '{white-fg}No description{/white-fg}'}
+ {gray-fg}─────────────────────────────────────{/gray-fg}
 
-${formatSectionHeader('Recent Time Logs', 50)}
-${recentTimeLogs}
+ ${formattedDescription || '{gray-fg}No description{/gray-fg}'}
+ ${imageHint}
 
-${formatSectionHeader('Link', 50)}
-{underline}${url}{/underline}
-    `.trim();
+ {gray-fg}${getIssueIcon(type)} ${type}  •  ${getStatusIcon(status)} ${status}{/gray-fg}
+  `.trim();
 
     this.widget.setContent(content);
     this.widget.screen.render();
@@ -347,37 +364,22 @@ ${formatSectionHeader('Link', 50)}
       return description;
     }
 
-    // Wrap long lines for better readability
-    const lines = description.split('\n');
-    const wrappedLines: string[] = [];
-    const maxLineLength = 80;
-
-    lines.forEach(line => {
-      if (line.length <= maxLineLength) {
-        wrappedLines.push(line);
-      } else {
-        // Simple word wrapping
-        const words = line.split(' ');
-        let currentLine = '';
-
-        words.forEach(word => {
-          if ((currentLine + word).length <= maxLineLength) {
-            currentLine += (currentLine ? ' ' : '') + word;
-          } else {
-            if (currentLine) {
-              wrappedLines.push(currentLine);
-            }
-            currentLine = word;
-          }
-        });
-
-        if (currentLine) {
-          wrappedLines.push(currentLine);
+    // Just return the description as-is, blessed will handle wrapping
+    // Remove any excessive blank lines
+    return description
+      .split('\n')
+      .filter((line, index, array) => {
+        // Keep non-empty lines
+        if (line.trim()) {
+          return true;
         }
-      }
-    });
-
-    return wrappedLines.join('\n');
+        // Keep single empty lines but remove consecutive empty lines
+        if (index === 0 || index === array.length - 1) {
+          return false;
+        }
+        return array[index - 1]?.trim() !== '';
+      })
+      .join('\n');
   }
 
   private getRecentTimeLogsForTask(taskKey: string): string {
@@ -431,7 +433,7 @@ ${formatSectionHeader('Link', 50)}
   private formatPriorityBadge(priority: string): string {
     const color = getPriorityColor(priority);
     const icon = getPriorityIcon(priority);
-    return `{${color}-fg}${icon} ${priority}{/${color}-fg}`;
+    return `{${color}-fg}${icon}{/${color}-fg} {${color}-fg}${priority}{/${color}-fg}`;
   }
 
   getWidget(): blessed.Widgets.BoxElement {

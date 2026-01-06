@@ -20,6 +20,60 @@ export JIRA_API_TOKEN="your-jira-api-token"
 export TEMPO_API_TOKEN="your-tempo-api-token"
 ```
 
+## Recommended Terminal Configuration
+
+### Fonts
+
+For optimal TUI experience, use one of these monospace fonts:
+
+**Highly Recommended:**
+- **Fira Code** - Excellent ligatures and readability
+- **JetBrains Mono** - Optimized for code, clear characters
+- **Cascadia Code** - Microsoft's modern terminal font
+
+**Good Options:**
+- Source Code Pro (Adobe)
+- Noto Sans Mono (wide Unicode support)
+- Ubuntu Mono
+
+**Installation (Ubuntu/Debian):**
+```bash
+sudo apt update
+sudo apt install fonts-firacode fonts-jetbrains-mono
+```
+
+**Installation (macOS):**
+```bash
+brew install --cask font-fira-code
+brew install --cask font-jetbrains-mono
+```
+
+**Download from:**
+- Fira Code: https://github.com/tonsky/FiraCode
+- JetBrains Mono: https://www.jetbrains.com/lp/mono/
+
+**Font Size:** 12-14px recommended for standard screens
+- Small laptops: 11-12px
+- Large monitors: 14-16px
+
+### Terminal Settings
+
+**GNOME Terminal:**
+1. Preferences > Text
+2. Uncheck "Use the system fixed width font"
+3. Select: Fira Code Regular
+4. Set size: 13
+
+**macOS Terminal:**
+1. Preferences > Profiles > Text
+2. Select Font: Fira Code
+3. Set size: 13
+
+**Windows Terminal:**
+1. Settings > Profiles > Defaults
+2. Font face: JetBrains Mono
+3. Size: 13
+
 **Get your tokens:**
 - **Jira:** [Create API token](https://id.atlassian.com/manage-profile/security/api-tokens)
 - **Tempo:** Go to `https://your-domain.atlassian.net/plugins/servlet/ac/io.tempo.jira/tempo-app#!/configuration/api-integration` (replace `your-domain` with your Jira domain)

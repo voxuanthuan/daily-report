@@ -1,7 +1,7 @@
 {
   "name": "jira-daily-report",
   "displayName": "jira-daily-report",
-  "description": "Generate Jira daily standup reports - VS Code extension and CLI tool",
+  "description": "Generate Jira daily standup reports - TUI CLI tool",
   "version": "0.1.131",
   "publisher": "thuanvo",
   "author": {
@@ -16,7 +16,7 @@
     "tempo",
     "productivity",
     "cli",
-    "vscode-extension"
+    "tui"
   ],
   "homepage": "https://github.com/voxuanthuan/daily-report#readme",
   "bugs": {
@@ -28,149 +28,33 @@
     "url": "https://github.com/voxuanthuan/daily-report.git"
   },
   "engines": {
-    "vscode": "^1.80.0",
     "node": ">=16.0.0"
   },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [],
-  "main": "./dist/extension.js",
   "bin": {
     "jira-report": "./dist/cli/index.js"
-  },
-  "contributes": {
-    "commands": [
-      {
-        "command": "jiraDailyReport.generate",
-        "title": "Generate Jira Daily Report"
-      },
-      {
-        "command": "jiraDailyReport.open",
-        "title": "Open Ticket"
-      },
-      {
-        "command": "jiraDailyReport.quickAction",
-        "title": "Jira Quick Action"
-      },
-      {
-        "command": "jiraDailyReport.myTickets",
-        "title": "My Jira Tickets"
-      },
-      {
-        "command": "jiraDailyReport.quickActionHelp",
-        "title": "Jira Quick Action Help"
-      },
-      {
-        "command": "jiraDailyReport.clearCache",
-        "title": "Clear Jira Daily Report Cache"
-      }
-    ],
-    "keybindings": [
-      {
-        "command": "jiraDailyReport.quickAction",
-        "key": "ctrl+shift+j",
-        "mac": "cmd+shift+j",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "jiraDailyReport.myTickets",
-        "key": "ctrl+shift+t",
-        "mac": "cmd+shift+t",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "jiraDailyReport.generate",
-        "key": "ctrl+shift+r",
-        "mac": "cmd+shift+r",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "jiraDailyReport.open",
-        "key": "ctrl+shift+o",
-        "mac": "cmd+shift+o",
-        "when": "editorTextFocus"
-      }
-    ],
-    "configuration": {
-      "title": "Jira Daily Report",
-      "properties": {
-        "grappleDailyReport.jiraServer": {
-          "type": "string",
-          "default": "https://grapplefinance.atlassian.net/",
-          "description": "Jira server URL (e.g., https://yourcompany.atlassian.net/)"
-        },
-        "grappleDailyReport.username": {
-          "type": "string",
-          "default": "",
-          "description": "Your Jira username (email) as thuan@wearebloom.com"
-        },
-        "grappleDailyReport.apiToken": {
-          "type": "string",
-          "default": "",
-          "description": "Your Jira API token (generate from Atlassian account)"
-        },
-        "grappleDailyReport.jiraTempoToken": {
-          "type": "string",
-          "default": "",
-          "description": "Your Jira Tempo API token (Tempo > Setting > Data Access > API Intergration)"
-        },
-        "grappleDailyReport.whoAmI": {
-          "type": "string",
-          "default": "Developer",
-          "description": "We support QA/QC now 🥹, pass: Developer/QC"
-        },
-        "grappleDailyReport.autoClipboard": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically copy the generated report to clipboard"
-        },
-        "grappleDailyReport.enableTimesheetIntegration": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable timesheet log parsing and integration features"
-        },
-        "grappleDailyReport.timesheetDateFormat": {
-          "type": "string",
-          "default": "YYYY-MM-DD",
-          "description": "Date format for timesheet entries (e.g., YYYY-MM-DD, MM/DD/YYYY)"
-        }
-      }
-    }
   },
   "files": [
     "dist/",
     "images/",
     "CLI.md",
     "README.md",
-    "README-vscode.md",
     "LICENSE"
   ],
   "scripts": {
-    "vscode:prepublish": "npm run package",
     "prepublishOnly": "npm run package",
     "compile": "npm run check-types && npm run lint && node esbuild.js",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "npm run check-types && npm run lint && node esbuild.js --production",
-    "compile-tests": "tsc -p . --outDir out",
-    "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "check-types": "tsc --noEmit",
-    "lint": "eslint src",
-    "test": "vscode-test"
+    "lint": "eslint src"
   },
   "devDependencies": {
     "@types/blessed": "^0.1.19",
-    "@types/mocha": "^10.0.10",
-    "@types/moment": "^2.13.0",
     "@types/node": "20.x",
-    "@types/vscode": "^1.80.0",
     "@typescript-eslint/eslint-plugin": "^8.25.0",
     "@typescript-eslint/parser": "^8.25.0",
-    "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1",
     "esbuild": "^0.25.0",
     "eslint": "^9.21.0",
     "npm-run-all": "^4.1.5",

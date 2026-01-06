@@ -1,10 +1,10 @@
 import blessed from 'neo-blessed';
 import contrib from 'blessed-contrib';
-import { getTheme } from './theme';
+import { getTheme, onThemeChange } from './theme';
 
 export interface LayoutPositions {
   todayPanel: { row: number; col: number; rowSpan: number; colSpan: number };
-  yesterdayPanel: { row: number; col: number; rowSpan: number; colSpan: number };
+  testingPanel: { row: number; col: number; rowSpan: number; colSpan: number };
   todoPanel: { row: number; col: number; rowSpan: number; colSpan: number };
   detailsPanel: { row: number; col: number; rowSpan: number; colSpan: number };
   timelogPanel: { row: number; col: number; rowSpan: number; colSpan: number };
@@ -17,22 +17,22 @@ export interface LayoutPositions {
  */
 const PANEL_SIZES = {
   standard: {
-    today: { rows: 5, cols: 5 },
-    yesterday: { rows: 3, cols: 5 },
-    todo: { rows: 4, cols: 5 },
-    details: { rows: 9, cols: 7 },      // Bigger - high priority
-    timelog: { rows: 3, cols: 7 },      // Smaller - low priority
+    today: { rows: 5, cols: 7 },        // Wider for full text
+    testing: { rows: 3, cols: 7 },      // Wider for full text
+    todo: { rows: 4, cols: 7 },         // Wider for full text
+    details: { rows: 9, cols: 5 },      // Narrower - still readable
+    timelog: { rows: 3, cols: 5 },      // Narrower - less priority
   },
   small: {
     today: { rows: 4, cols: 6 },
-    yesterday: { rows: 3, cols: 6 },
+    testing: { rows: 3, cols: 6 },
     todo: { rows: 5, cols: 6 },
-    details: { rows: 9, cols: 6 },      // Bigger - high priority
-    timelog: { rows: 3, cols: 6 },      // Smaller - low priority
+    details: { rows: 9, cols: 6 },
+    timelog: { rows: 3, cols: 6 },
   },
   tiny: {
     today: { rows: 3, cols: 12 },
-    yesterday: { rows: 3, cols: 12 },
+    testing: { rows: 3, cols: 12 },
     todo: { rows: 3, cols: 12 },
     details: { rows: 6, cols: 12 },
     timelog: { rows: 3, cols: 12 },
@@ -78,8 +78,8 @@ export class Layout {
       const sizes = PANEL_SIZES.tiny;
       return {
         todayPanel: { row: 0, col: 0, rowSpan: sizes.today.rows, colSpan: sizes.today.cols },
-        yesterdayPanel: { row: 3, col: 0, rowSpan: sizes.yesterday.rows, colSpan: sizes.yesterday.cols },
-        todoPanel: { row: 6, col: 0, rowSpan: sizes.todo.rows, colSpan: sizes.todo.cols },
+        todoPanel: { row: 3, col: 0, rowSpan: sizes.todo.rows, colSpan: sizes.todo.cols },
+        testingPanel: { row: 7, col: 0, rowSpan: sizes.testing.rows, colSpan: sizes.testing.cols },
         detailsPanel: { row: 9, col: 0, rowSpan: sizes.details.rows, colSpan: sizes.details.cols },
         timelogPanel: { row: 15, col: 0, rowSpan: sizes.timelog.rows, colSpan: sizes.timelog.cols },
         guideBar: { bottom: 0, left: 0, width: '100%', height: 1 },
@@ -89,21 +89,21 @@ export class Layout {
       const sizes = PANEL_SIZES.small;
       return {
         todayPanel: { row: 0, col: 0, rowSpan: sizes.today.rows, colSpan: sizes.today.cols },
-        yesterdayPanel: { row: 4, col: 0, rowSpan: sizes.yesterday.rows, colSpan: sizes.yesterday.cols },
-        todoPanel: { row: 7, col: 0, rowSpan: sizes.todo.rows, colSpan: sizes.todo.cols },
+        todoPanel: { row: 4, col: 0, rowSpan: sizes.todo.rows, colSpan: sizes.todo.cols },
+        testingPanel: { row: 9, col: 0, rowSpan: sizes.testing.rows, colSpan: sizes.testing.cols },
         detailsPanel: { row: 0, col: 6, rowSpan: sizes.details.rows, colSpan: sizes.details.cols },
         timelogPanel: { row: 9, col: 6, rowSpan: sizes.timelog.rows, colSpan: sizes.timelog.cols },
         guideBar: { bottom: 0, left: 0, width: '100%', height: 1 },
       };
     } else {
-      // Default layout for standard terminals - prioritizes Today and Details panels
+      // Default layout for standard terminals - prioritizes task panels with more width
       const sizes = PANEL_SIZES.standard;
       return {
         todayPanel: { row: 0, col: 0, rowSpan: sizes.today.rows, colSpan: sizes.today.cols },
-        yesterdayPanel: { row: 5, col: 0, rowSpan: sizes.yesterday.rows, colSpan: sizes.yesterday.cols },
-        todoPanel: { row: 8, col: 0, rowSpan: sizes.todo.rows, colSpan: sizes.todo.cols },
-        detailsPanel: { row: 0, col: 5, rowSpan: sizes.details.rows, colSpan: sizes.details.cols },
-        timelogPanel: { row: 9, col: 5, rowSpan: sizes.timelog.rows, colSpan: sizes.timelog.cols },
+        todoPanel: { row: 5, col: 0, rowSpan: sizes.todo.rows, colSpan: sizes.todo.cols },
+        testingPanel: { row: 9, col: 0, rowSpan: sizes.testing.rows, colSpan: sizes.testing.cols },
+        detailsPanel: { row: 0, col: 7, rowSpan: sizes.details.rows, colSpan: sizes.details.cols },
+        timelogPanel: { row: 9, col: 7, rowSpan: sizes.timelog.rows, colSpan: sizes.timelog.cols },
         guideBar: { bottom: 0, left: 0, width: '100%', height: 1 },
       };
     }
@@ -130,6 +130,7 @@ export class Layout {
   }
 
   createGuideBar(): blessed.Widgets.BoxElement {
+    const theme = getTheme();
     const guideBar = blessed.box({
       bottom: this.positions.guideBar.bottom,
       left: this.positions.guideBar.left,
@@ -137,24 +138,28 @@ export class Layout {
       height: this.positions.guideBar.height,
       tags: true,
       style: {
-        bg: 'black',
-        fg: 'white',
+        bg: theme.bg,
+        fg: theme.fg,
       },
       content: this.formatGuideBarContent(),
     });
 
     this.screen.append(guideBar);
+    this.setupThemeListener(guideBar);
     return guideBar;
   }
 
-  private formatGuideBarContent(lastSync?: Date): string {
-    const theme = getTheme();
-    const action = 'white-fg';   // White for action names
-    const key = 'yellow-fg';     // Yellow for keyboard shortcuts
-    const sep = 'gray-fg';       // Grey for separators
-    const info = 'cyan-fg';      // Cyan for info
+  private setupThemeListener(guideBar: blessed.Widgets.BoxElement): void {
+    onThemeChange(() => {
+      const theme = getTheme();
+      if (guideBar.style) {
+        guideBar.style.bg = theme.bg;
+        guideBar.style.fg = theme.fg;
+      }
+    });
+  }
 
-    // Calculate sync time
+  private formatGuideBarContent(lastSync?: Date): string {
     let syncInfo = '';
     if (lastSync) {
       const now = new Date();
@@ -163,40 +168,35 @@ export class Layout {
       const diffHours = Math.floor(diffMins / 60);
 
       if (diffMins < 1) {
-        syncInfo = `{${info}}✓ Synced just now{/${info}}`;
+        syncInfo = `{cyan-fg}✓ Synced just now{/cyan-fg}`;
       } else if (diffMins < 60) {
-        syncInfo = `{${info}}✓ Synced ${diffMins}m ago{/${info}}`;
+        syncInfo = `{cyan-fg}✓ Synced ${diffMins}m ago{/cyan-fg}`;
       } else {
-        syncInfo = `{${info}}✓ Synced ${diffHours}h ago{/${info}}`;
+        syncInfo = `{cyan-fg}✓ Synced ${diffHours}h ago{/cyan-fg}`;
       }
     }
 
-    // Simplified shortcuts for space
     const shortcuts = [
-      `{${action}}LogTime:{/${action}} {${key}}i{/${key}}`,
-      `{${action}}Copy:{/${action}} {${key}}y{/${key}}`,
-      `{${action}}Title:{/${action}} {${key}}t{/${key}}`,
-      `{${action}}Status:{/${action}} {${key}}s{/${key}}`,
-      `{${action}}Help:{/${action}} {${key}}?{/${key}}`,
-      `{${action}}Refresh:{/${action}} {${key}}r{/${key}}`,
+      `{white-fg}LogTime:/{white-fg} {cyan-fg}i{/cyan-fg}`,
+      `{white-fg}Copy:/{white-fg} {cyan-fg}y{/cyan-fg}`,
+      `{white-fg}Title:/{white-fg} {cyan-fg}t{/cyan-fg}`,
+      `{white-fg}Status:/{white-fg} {cyan-fg}s{/cyan-fg}`,
+      `{white-fg}Actions:/{white-fg} {cyan-fg}a{/cyan-fg}`,
+      `{white-fg}Refresh:/{white-fg} {cyan-fg}r{/cyan-fg}`,
     ];
 
-    const shortcutsStr = shortcuts.join(` {${sep}}|{/${sep}} `);
+    const shortcutsStr = shortcuts.join(' {gray-fg}|{/gray-fg} ');
 
     if (syncInfo) {
-      return `${syncInfo}  {${sep}}│{/${sep}}  ${shortcutsStr}`;
+      return `${syncInfo}  {gray-fg}│{/gray-fg}  ${shortcutsStr}`;
     }
     return shortcutsStr;
   }
 
   updateGuideBar(guideBar: blessed.Widgets.BoxElement, spinner?: string, lastSync?: Date): void {
     if (spinner) {
-      // Show spinner at the start of guide bar, keep shortcuts visible
-      const yellow = 'yellow-fg';
-      const grey = 'gray-fg';
-      guideBar.setContent(`{${yellow}}${spinner}{/${yellow}} {${grey}}│{/${grey}} ${this.formatGuideBarContent(lastSync)}`);
+      guideBar.setContent(`{cyan-fg}${spinner}{/cyan-fg} {gray-fg}│{/gray-fg} ${this.formatGuideBarContent(lastSync)}`);
     } else {
-      // Show normal guide bar with sync info
       guideBar.setContent(this.formatGuideBarContent(lastSync));
     }
   }

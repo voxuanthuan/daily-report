@@ -154,16 +154,15 @@ export class ChangeStatusAction {
         items: items,
         style: {
           selected: {
-            bg: theme.primary,  // Use primary color (Crail) for selected item
-            fg: '#ffffff',       // White text
+            bg: theme.selectedBg,  // Dark subtle background
+            fg: theme.selectedFg,  // Yellow/accent text
             bold: true,
           },
           item: {
-            fg: 'white',
-            bg: 'black',
+            fg: theme.fg,  // Theme text color
           },
           border: {
-            fg: theme.primary,  // Use primary color (Crail) for border
+            fg: theme.primary,  // Cyan border
           },
         },
       });
