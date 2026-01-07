@@ -53,7 +53,7 @@ export class CLIConfigProvider implements IConfigProvider {
       autoClipboard: process.env.AUTO_CLIPBOARD === 'true' || this.config.autoClipboard !== false,
       enableTimesheetIntegration: this.config.enableTimesheetIntegration !== false,
       timesheetDateFormat: this.config.timesheetDateFormat || 'YYYY-MM-DD',
-      theme: process.env.THEME || this.config.theme || 'solarized',
+      theme: process.env.THEME || this.config.theme || 'dark',
     };
 
     this.initialized = true;

@@ -348,8 +348,8 @@ export function setTheme(mode: ThemeMode): void {
 }
 
 export function getTheme(): ThemeColors {
-  // Defensive check: ensure theme is always initialized
-  if (!currentTheme) {
+  // Defensive check: ensure theme is always initialized with all required properties
+  if (!currentTheme || !currentTheme.fg || !currentTheme.bg) {
     currentTheme = DARK_THEME;
   }
   return currentTheme;
@@ -397,15 +397,15 @@ export const COLORS = currentTheme;
 export function getBoxStyle(focused: boolean): Widgets.BoxOptions['style'] {
   return {
     border: {
-      fg: focused ? currentTheme.focused : currentTheme.border,
+      fg: focused ? currentTheme?.focused : currentTheme?.border,
     },
     focus: {
       border: {
-        fg: currentTheme.focused,
+        fg: currentTheme?.focused,
       },
     },
-    bg: currentTheme.bg,
-    fg: currentTheme.fg,
+    bg: currentTheme?.bg,
+    fg: currentTheme?.fg,
   };
 }
 
@@ -415,35 +415,35 @@ export function getListStyle(focused: boolean): Widgets.ListOptions<any>['style'
   if (focused) {
     return {
       selected: {
-        bg: theme.selectedBg,
-        fg: theme.selectedFg,
+        bg: theme?.selectedBg,
+        fg: theme?.selectedFg,
         bold: true,  // Bold for selected item
         underline: false,
         inverse: false,
       },
       item: {
-        fg: theme.fg,
+        fg: theme?.fg,
         bg: 'transparent',  // Transparent background
       },
       border: {
-        fg: theme.focused,
+        fg: theme?.focused,
         bold: false,
       },
       focus: {
         border: {
-          fg: theme.focused,
+          fg: theme?.focused,
           bold: false,
         },
         selected: {
-          bg: theme.selectedBg,
-          fg: theme.selectedFg,
+          bg: theme?.selectedBg,
+          fg: theme?.selectedFg,
           bold: true,  // Bold for selected item
           underline: false,
           inverse: false,
         },
       },
       // Set transparent background for the entire list
-      fg: theme.fg,
+      fg: theme?.fg,
       bg: 'transparent',
     };
   } else {
@@ -451,20 +451,20 @@ export function getListStyle(focused: boolean): Widgets.ListOptions<any>['style'
     return {
       selected: {
         bg: 'transparent',  // No highlight
-        fg: theme.fg,  // Same as normal text - no highlight
+        fg: theme?.fg,  // Same as normal text - no highlight
         bold: false,   // Not bold when unfocused
         underline: false,
         inverse: false,
       },
       item: {
-        fg: theme.fg,
+        fg: theme?.fg,
         bg: 'transparent',  // Transparent background
       },
       border: {
-        fg: theme.unfocused,
+        fg: theme?.unfocused,
       },
       // Set transparent background for the entire list
-      fg: theme.fg,
+      fg: theme?.fg,
       bg: 'transparent',
     };
   }
@@ -509,34 +509,34 @@ export function getStatusIcon(status: string): string {
 
 export function getPriorityColor(priority: string): string {
   const theme = getTheme();
-  const priorityColorMap: Record<string, string> = {
-    'Highest': theme.error,
-    'High': theme.warning,
-    'Medium': theme.textDim,
-    'Low': theme.info,
-    'Lowest': theme.textDim,
-    'default': theme.fg,
+  const priorityColorMap: Record<string, string | undefined> = {
+    'Highest': theme?.error,
+    'High': theme?.warning,
+    'Medium': theme?.textDim,
+    'Low': theme?.info,
+    'Lowest': theme?.textDim,
+    'default': theme?.fg,
   };
-  return priorityColorMap[priority] || priorityColorMap['default'];
+  return priorityColorMap[priority] || priorityColorMap['default'] || 'white';
 }
 
 export function getStatusColor(status: string): string {
   const theme = getTheme();
-  const statusColorMap: Record<string, string> = {
-    'To Do': theme.textDim,
-    'In Progress': theme.accent,
-    'Under Review': theme.info,
-    'Code Review': theme.info,
-    'Testing': theme.warning,
-    'Done': theme.success,
-    'Closed': theme.success,
-    'Blocked': theme.error,
-    'On Hold': theme.textDim,
-    'Selected for Development': theme.info,
-    'Ready for Testing': theme.warning,
-    'default': theme.fg,
+  const statusColorMap: Record<string, string | undefined> = {
+    'To Do': theme?.textDim,
+    'In Progress': theme?.accent,
+    'Under Review': theme?.info,
+    'Code Review': theme?.info,
+    'Testing': theme?.warning,
+    'Done': theme?.success,
+    'Closed': theme?.success,
+    'Blocked': theme?.error,
+    'On Hold': theme?.textDim,
+    'Selected for Development': theme?.info,
+    'Ready for Testing': theme?.warning,
+    'default': theme?.fg,
   };
-  return statusColorMap[status] || statusColorMap['default'];
+  return statusColorMap[status] || statusColorMap['default'] || 'white';
 }
 
 /**
