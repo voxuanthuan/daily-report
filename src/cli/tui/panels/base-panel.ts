@@ -190,8 +190,13 @@ export abstract class BasePanel {
     
     // Explicitly update all style properties for blessed to recognize changes
     if (this.widget.style) {
+      // Ensure border object exists before accessing its properties
+      if (!this.widget.style.border) {
+        this.widget.style.border = {};
+      }
+      
       // Update border color with null safety
-      if (this.widget.style.border && newStyle.border && newStyle?.border?.fg) {
+      if (newStyle.border && newStyle?.border?.fg) {
         this.widget.style.border.fg = newStyle.border.fg;
       }
       
@@ -244,8 +249,13 @@ export abstract class BasePanel {
     if (newStyle && newStyle.border && newStyle?.fg && newStyle?.selected && newStyle?.item) {
       this.widget.style = newStyle;
       
+      // Ensure border object exists before accessing its properties
+      if (!this.widget.style.border) {
+        this.widget.style.border = {};
+      }
+      
       // Explicitly update border color to ensure it changes with null safety
-      if (this.widget.style.border && newStyle.border && newStyle.border.fg) {
+      if (newStyle.border && newStyle.border.fg) {
         this.widget.style.border.fg = newStyle.border.fg;
       }
     }

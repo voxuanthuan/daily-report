@@ -138,8 +138,13 @@ export class DetailsPanel {
     
     // Explicitly update all style properties
     if (this.widget.style) {
+      // Ensure border object exists before accessing its properties
+      if (!this.widget.style.border) {
+        this.widget.style.border = {};
+      }
+      
       // Update border color with null safety
-      if (this.widget.style.border && theme.border) {
+      if (theme.border) {
         this.widget.style.border.fg = theme.border;
       }
       
