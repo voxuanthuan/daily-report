@@ -299,21 +299,33 @@ const SOLARIZED_LIGHT_THEME: ThemeColors = {
   textSecondary: '#657b83',    // Base00 (secondary text)
 };
 
-// Current active theme - explicitly initialized to prevent undefined access
-// Using Object.assign for better compatibility with bundlers
-let currentTheme: ThemeColors = Object.assign({}, DARK_THEME);
+// Current active theme - explicitly initialized with hardcoded defaults to prevent undefined access
+// This ensures the theme is always valid even if bundlers reorder module initialization
+let currentTheme: ThemeColors = {
+  primary: '#61afef',
+  focused: '#61afef',
+  unfocused: '#5c6370',
+  selectedBg: '#2c323c',
+  selectedFg: '#e2b714',
+  border: '#5c6370',
+  error: '#e06c75',
+  success: '#98c379',
+  warning: '#e5c07b',
+  info: '#61afef',
+  bg: 'black',
+  fg: 'white',
+  accent: '#e2b714',
+  muted: '#9ca3af',
+  highlight: '#61afef',
+  dimmed: '#6b7280',
+  textDim: '#646669',
+  textSecondary: '#d1d0c5',
+};
 let currentMode: ThemeMode = 'dark';
 let isInitializing: boolean = true; // Flag to prevent renders during initialization
 
 // Theme change listeners
 const themeChangeListeners: Set<() => void> = new Set();
-
-// Initialize theme immediately at module load to prevent any undefined access
-(function initializeTheme() {
-  if (!currentTheme ||!currentTheme?.fg) {
-    currentTheme = Object.assign({}, DARK_THEME);
-  }
-})();
 
 /**
  * Detect system theme (works in terminals with COLORFGBG or terminal capabilities)
