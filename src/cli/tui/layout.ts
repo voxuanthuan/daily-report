@@ -131,6 +131,10 @@ export class Layout {
 
   createGuideBar(): blessed.Widgets.BoxElement {
     const theme = getTheme();
+    // Defensive check: ensure theme has required properties
+    const bg = theme?.bg || 'black';
+    const fg = theme?.fg || 'white';
+    
     const guideBar = blessed.box({
       bottom: this.positions.guideBar.bottom,
       left: this.positions.guideBar.left,
@@ -138,8 +142,8 @@ export class Layout {
       height: this.positions.guideBar.height,
       tags: true,
       style: {
-        bg: theme.bg,
-        fg: theme.fg,
+        bg,
+        fg,
       },
       content: this.formatGuideBarContent(),
     });
@@ -153,8 +157,8 @@ export class Layout {
     onThemeChange(() => {
       const theme = getTheme();
       if (guideBar.style) {
-        guideBar.style.bg = theme.bg;
-        guideBar.style.fg = theme.fg;
+        guideBar.style.bg = theme?.bg || 'black';
+        guideBar.style.fg = theme?.fg || 'white';
       }
     });
   }

@@ -335,6 +335,10 @@ export function setTheme(mode: ThemeMode): void {
 }
 
 export function getTheme(): ThemeColors {
+  // Defensive check: ensure theme is always initialized
+  if (!currentTheme) {
+    currentTheme = DARK_THEME;
+  }
   return currentTheme;
 }
 
