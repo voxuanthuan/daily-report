@@ -300,11 +300,19 @@ const SOLARIZED_LIGHT_THEME: ThemeColors = {
 };
 
 // Current active theme - explicitly initialized to prevent undefined access
-let currentTheme: ThemeColors = { ...DARK_THEME };
+// Using Object.assign for better compatibility with bundlers
+let currentTheme: ThemeColors = Object.assign({}, DARK_THEME);
 let currentMode: ThemeMode = 'dark';
 
 // Theme change listeners
 const themeChangeListeners: Set<() => void> = new Set();
+
+// Initialize theme immediately at module load to prevent any undefined access
+(function initializeTheme() {
+  if (!currentTheme ||!currentTheme.fg) {
+    currentTheme = Object.assign({}, DARK_THEME);
+  }
+})();
 
 /**
  * Detect system theme (works in terminals with COLORFGBG or terminal capabilities)
@@ -402,17 +410,18 @@ export function onThemeChange(listener: () => void): () => void {
 export const COLORS = currentTheme;
 
 export function getBoxStyle(focused: boolean): Widgets.BoxOptions['style'] {
+  const theme = getTheme(); // Use getTheme() to ensure theme is always initialized
   return {
     border: {
-      fg: (focused ? currentTheme?.focused : currentTheme?.border) || '#5c6370',
+      fg: (focused ? theme?.focused : theme?.border) || '#5c6370',
     },
     focus: {
       border: {
-        fg: currentTheme?.focused || '#61afef',
+        fg: theme?.focused || '#61afef',
       },
     },
-    bg: currentTheme?.bg || 'black',
-    fg: currentTheme?.fg || 'white',
+    bg: theme?.bg || 'black',
+    fg: theme?.fg || 'white',
   };
 }
 
