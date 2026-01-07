@@ -714,6 +714,21 @@ export class TUIApp {
     }
   }
 
+  /**
+   * Clean worklog description by removing "Working on issue XXX-123" prefix
+   * that Tempo API auto-generates
+   */
+  private cleanWorklogDescription(description: string): string {
+    if (!description) {
+      return '';
+    }
+    
+    // Remove "Working on issue XXX-123" pattern (case insensitive)
+    // Handles prefixes with numbers like B2B-1292
+    const cleaned = description.replace(/^Working on issue\s+[A-Z0-9]+-\d+\s*/i, '');
+    return cleaned.trim();
+  }
+
   private async handleCopyReport(): Promise<void> {
     const state = this.state.getState();
 
@@ -732,7 +747,10 @@ export class TUIApp {
         // Add worklog descriptions as sub-items with deeper indentation
         worklogs.forEach(worklog => {
           if (worklog.description && worklog.description.trim()) {
-            lines.push(`    - ${worklog.description}`);
+            const cleanedDesc = this.cleanWorklogDescription(worklog.description);
+            if (cleanedDesc) {
+              lines.push(`    - ${cleanedDesc}`);
+            }
           }
         });
       });

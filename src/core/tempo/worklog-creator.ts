@@ -177,8 +177,8 @@ export class TempoWorklogCreator {
         timeSpentSeconds,
         startDate,
         startTime,
-        description,
         authorAccountId: this.authorAccountId,
+        ...(description && description.trim() ? { description: description.trim() } : {}),
       };
 
       const response: AxiosResponse<CreateWorklogResponse> = await this.tempoAxios.post('/worklogs', worklogData);
