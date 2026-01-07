@@ -190,24 +190,26 @@ export abstract class BasePanel {
     
     // Explicitly update all style properties for blessed to recognize changes
     if (this.widget.style) {
-      // Update border color
-      if (this.widget.style.border) {
+      // Update border color with null safety
+      if (this.widget.style.border && newStyle.border) {
         this.widget.style.border.fg = newStyle.border.fg;
       }
       
-      // Update foreground (text) color
-      this.widget.style.fg = newStyle.fg;
+      // Update foreground (text) color with null safety
+      if (newStyle.fg) {
+        this.widget.style.fg = newStyle.fg;
+      }
       
       // Background is transparent - not set
       
-      // Update selected item colors
-      if (this.widget.style.selected) {
+      // Update selected item colors with null safety
+      if (this.widget.style.selected && newStyle.selected) {
         this.widget.style.selected.fg = newStyle.selected.fg;
         this.widget.style.selected.bg = newStyle.selected.bg;
       }
       
-      // Update item colors
-      if (this.widget.style.item) {
+      // Update item colors with null safety
+      if (this.widget.style.item && newStyle.item) {
         this.widget.style.item.fg = newStyle.item.fg;
         this.widget.style.item.bg = newStyle.item.bg;
       }
@@ -240,8 +242,8 @@ export abstract class BasePanel {
     // Update the full style
     this.widget.style = newStyle;
 
-    // Explicitly update border color to ensure it changes
-    if (this.widget.style.border) {
+    // Explicitly update border color to ensure it changes with null safety
+    if (this.widget.style.border && newStyle.border) {
       this.widget.style.border.fg = newStyle.border.fg;
     }
 

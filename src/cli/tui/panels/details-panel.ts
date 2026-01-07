@@ -138,13 +138,15 @@ export class DetailsPanel {
     
     // Explicitly update all style properties
     if (this.widget.style) {
-      // Update border color
-      if (this.widget.style.border) {
+      // Update border color with null safety
+      if (this.widget.style.border && theme.border) {
         this.widget.style.border.fg = theme.border;
       }
       
       // Update foreground color only - background is transparent
-      this.widget.style.fg = theme.fg;
+      if (theme.fg) {
+        this.widget.style.fg = theme.fg;
+      }
     }
     
     this.render();

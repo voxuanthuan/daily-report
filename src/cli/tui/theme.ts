@@ -183,16 +183,19 @@ interface ThemeColors {
   muted: string;
   highlight: string;
   dimmed: string;
+  // Text semantic colors (for theme-aware styling)
+  textDim: string;          // Dimmed/secondary text
+  textSecondary: string;    // Secondary content text
 }
 
 // Dark theme (default) - using Claude's color palette
 // All colors optimized for visibility on black backgrounds
 const DARK_THEME: ThemeColors = {
-  primary: '#61afef',             // Cyan for focused panel borders (changed from red/terracotta)
+  primary: '#61afef',             // Cyan for focused panel borders
   focused: '#61afef',            // Cyan for focused panel borders
   unfocused: '#5c6370',          // Darker gray for unfocused borders
   selectedBg: '#2c323c',         // Subtle dark background for selected items
-  selectedFg: '#e2b714',         // Gold for selected item text (matches MINIMALIST_PALETTE.accent)
+  selectedFg: '#e2b714',         // Gold for selected item text
   border: '#5c6370',             // Darker gray for default borders
   error: '#e06c75',              // Softer red (only for bugs/overdue)
   success: '#98c379',            // Green
@@ -201,9 +204,11 @@ const DARK_THEME: ThemeColors = {
   bg: 'black',
   fg: 'white',
   accent: '#e2b714',             // Gold accent for interactive elements
-  muted: '#9ca3af',              // Light gray for muted text (visible on black)
+  muted: '#9ca3af',              // Light gray for muted text
   highlight: '#61afef',          // Cyan for highlights
-  dimmed: '#6b7280',             // Medium gray instead of dark gray (visible on black)
+  dimmed: '#6b7280',             // Medium gray (visible on black)
+  textDim: '#646669',            // Dimmed text for secondary content
+  textSecondary: '#d1d0c5',      // Secondary text color
 };
 
 // Light theme - using Claude's color palette
@@ -224,11 +229,13 @@ const LIGHT_THEME: ThemeColors = {
   muted: CLAUDE_COLORS.CLOUDY,
   highlight: '#0184bc',
   dimmed: CLAUDE_COLORS.PAMPAS,
+  textDim: '#6b7280',            // Dimmed text for secondary content
+  textSecondary: '#4b5563',      // Secondary text color
 };
 
 // Dracula theme - popular dark theme
 const DRACULA_THEME: ThemeColors = {
-  primary: '#8be9fd',            // Cyan for focused borders (changed from purple)
+  primary: '#8be9fd',            // Cyan for focused borders
   focused: '#8be9fd',
   unfocused: '#6272a4',          // Blue-gray
   selectedBg: '#44475a',         // Subtle dark background
@@ -244,11 +251,13 @@ const DRACULA_THEME: ThemeColors = {
   muted: '#6272a4',
   highlight: '#8be9fd',
   dimmed: '#44475a',
+  textDim: '#6272a4',            // Dimmed text (blue-gray)
+  textSecondary: '#bd93f9',      // Secondary text (purple)
 };
 
 // Solarized Dark theme - eye-friendly precision colors
 const SOLARIZED_DARK_THEME: ThemeColors = {
-  primary: '#2aa198',         // Cyan for focused borders (changed from yellow)
+  primary: '#2aa198',         // Cyan for focused borders
   focused: '#2aa198',
   unfocused: '#586e75',       // Base01 (content tone)
   selectedBg: '#073642',       // Base02 (darker background)
@@ -264,11 +273,13 @@ const SOLARIZED_DARK_THEME: ThemeColors = {
   muted: '#586e75',           // Base01
   highlight: '#2aa198',        // Cyan
   dimmed: '#073642',           // Base02
+  textDim: '#586e75',          // Base01 (dimmed text)
+  textSecondary: '#839496',    // Base0 (secondary text)
 };
 
 // Solarized Light theme - eye-friendly precision colors
 const SOLARIZED_LIGHT_THEME: ThemeColors = {
-  primary: '#2aa198',         // Cyan for focused borders (changed from yellow)
+  primary: '#2aa198',         // Cyan for focused borders
   focused: '#2aa198',
   unfocused: '#93a1a1',       // Base1 (brighter content)
   selectedBg: '#eee8d5',       // Base2 (light background)
@@ -284,6 +295,8 @@ const SOLARIZED_LIGHT_THEME: ThemeColors = {
   muted: '#93a1a1',           // Base1
   highlight: '#2aa198',        // Cyan
   dimmed: '#eee8d5',           // Base2
+  textDim: '#93a1a1',          // Base1 (dimmed text)
+  textSecondary: '#657b83',    // Base00 (secondary text)
 };
 
 // Current active theme
@@ -397,7 +410,7 @@ export function getBoxStyle(focused: boolean): Widgets.BoxOptions['style'] {
 }
 
 export function getListStyle(focused: boolean): Widgets.ListOptions<any>['style'] {
-  const theme = currentTheme; // Use current theme instead of hardcoded palette
+  const theme = getTheme(); // Use getTheme() to ensure theme is always initialized
   
   if (focused) {
     return {
@@ -461,9 +474,10 @@ export function getListStyle(focused: boolean): Widgets.ListOptions<any>['style'
  * Get consistent scrollbar styling using theme colors
  */
 export function getScrollbarStyle(): { ch: string; style: { fg: string } } {
+  const theme = getTheme();
   return {
     ch: '|',  // Thinner scrollbar character
-    style: { fg: MINIMALIST_PALETTE.accent },  // Gold accent for scrollbar
+    style: { fg: theme.accent },  // Theme accent color for scrollbar
   };
 }
 
@@ -472,12 +486,13 @@ export function getScrollbarStyle(): { ch: string; style: { fg: string } } {
  * Minimalist approach: focused panels get gold accent, unfocused stay readable
  */
 export function getPanelLabelStyle(focused: boolean, label: string): string {
+  const theme = getTheme();
   if (focused) {
-    // Gold accent for focused panels - matches MINIMALIST_PALETTE.accent
-    return `{${MINIMALIST_PALETTE.accent}-fg}${label}{/${MINIMALIST_PALETTE.accent}-fg}`;
+    // Accent color for focused panels
+    return `{${theme.accent}-fg}${label}{/${theme.accent}-fg}`;
   }
-  // Beige text for unfocused panels - matches MINIMALIST_PALETTE.text
-  return `{${MINIMALIST_PALETTE.text}-fg}${label}{/${MINIMALIST_PALETTE.text}-fg}`;
+  // Unfocused panels: return plain label - will use panel's default fg style
+  return label;
 }
 
 export function getIssueIcon(issueType: string): string {
@@ -493,11 +508,35 @@ export function getStatusIcon(status: string): string {
 }
 
 export function getPriorityColor(priority: string): string {
-  return PRIORITY_COLORS[priority] || PRIORITY_COLORS['default'];
+  const theme = getTheme();
+  const priorityColorMap: Record<string, string> = {
+    'Highest': theme.error,
+    'High': theme.warning,
+    'Medium': theme.textDim,
+    'Low': theme.info,
+    'Lowest': theme.textDim,
+    'default': theme.fg,
+  };
+  return priorityColorMap[priority] || priorityColorMap['default'];
 }
 
 export function getStatusColor(status: string): string {
-  return STATUS_COLORS[status] || STATUS_COLORS['default'];
+  const theme = getTheme();
+  const statusColorMap: Record<string, string> = {
+    'To Do': theme.textDim,
+    'In Progress': theme.accent,
+    'Under Review': theme.info,
+    'Code Review': theme.info,
+    'Testing': theme.warning,
+    'Done': theme.success,
+    'Closed': theme.success,
+    'Blocked': theme.error,
+    'On Hold': theme.textDim,
+    'Selected for Development': theme.info,
+    'Ready for Testing': theme.warning,
+    'default': theme.fg,
+  };
+  return statusColorMap[status] || statusColorMap['default'];
 }
 
 /**
