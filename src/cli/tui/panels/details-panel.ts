@@ -23,6 +23,8 @@ export class DetailsPanel {
   private state: StateManager;
   private configManager: ConfigManager;
   private imageUrls: string[] = [];
+  private lastRenderedTaskId: string | null = null;
+  private descriptionCache: Map<string, string> = new Map();
 
   constructor(
     grid: any,
@@ -216,8 +218,19 @@ export class DetailsPanel {
   }
 
   private subscribe(): void {
-    this.state.subscribe(() => {
-      this.render();
+    this.state.subscribe((state, changedKeys) => {
+      if (!changedKeys) {
+        this.render();
+        return;
+      }
+
+      const shouldRender = changedKeys.has('*') ||
+        changedKeys.has('focusedPanel') ||
+        Array.from(changedKeys).some(key => key.startsWith('panels.'));
+
+      if (shouldRender) {
+        this.render();
+      }
     });
   }
 
@@ -225,10 +238,21 @@ export class DetailsPanel {
     const task = this.state.getCurrentTask();
 
     if (!task) {
-      this.widget.setContent('{center}{white-fg}No task selected{/white-fg}{/center}');
-      this.widget.screen.render();
+      if (this.lastRenderedTaskId !== null) {
+        this.widget.setContent('{center}{white-fg}No task selected{/white-fg}{/center}');
+        this.widget.screen.render();
+        this.lastRenderedTaskId = null;
+      }
       return;
     }
+
+    const currentTaskId = task.key || task.id;
+
+    if (currentTaskId === this.lastRenderedTaskId) {
+      return;
+    }
+
+    this.lastRenderedTaskId = currentTaskId;
 
     const key = task.key || task.id;
     const type = task.fields?.issuetype?.name || 'Task';
@@ -236,9 +260,14 @@ export class DetailsPanel {
     const summary = task.fields.summary;
     const rawDescription = task.fields.description;
 
-    // Parse and format description (handle ADF format)
-    const description = this.parseDescription(rawDescription);
-    const formattedDescription = this.formatDescription(description);
+    let formattedDescription = '';
+    if (this.descriptionCache.has(currentTaskId)) {
+      formattedDescription = this.descriptionCache.get(currentTaskId)!;
+    } else {
+      const description = this.parseDescription(rawDescription);
+      formattedDescription = this.formatDescription(description);
+      this.descriptionCache.set(currentTaskId, formattedDescription);
+    }
 
     const imageCount = this.imageUrls.length;
     const isKitty = process.env.TERM === 'xterm-kitty' || process.env.KITTY_WINDOW_ID;

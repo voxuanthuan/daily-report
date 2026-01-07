@@ -16,6 +16,9 @@ interface JiraIssue {
 
 export class TodayPanel extends BasePanel {
   private onSelectCallback?: (task: any) => Promise<void>;
+  private formattedItemCache: Map<string, string> = new Map();
+  private timeLoggedCache: Map<string, number> = new Map();
+  private lastWorklogsHash: string = '';
 
   constructor(
     grid: any,
@@ -25,6 +28,32 @@ export class TodayPanel extends BasePanel {
   ) {
     super(grid, state, 'today', position, '');
     this.onSelectCallback = onSelectCallback;
+    this.overrideSubscribe();
+  }
+
+  private overrideSubscribe(): void {
+    const originalSubscribe = (this as any).subscribe;
+    const baseSubscribe = originalSubscribe.bind(this);
+    
+    (this as any).subscribe = () => {
+      this.state.subscribe((state, changedKeys) => {
+        if (!changedKeys) {
+          this.render();
+          return;
+        }
+
+        const shouldRender = changedKeys.has('*') ||
+          changedKeys.has('tasks') ||
+          changedKeys.has('tasks.inProgress') ||
+          changedKeys.has('tasks.yesterday') ||
+          changedKeys.has('worklogs') ||
+          changedKeys.has('panels.today');
+
+        if (shouldRender) {
+          this.render();
+        }
+      });
+    };
   }
 
   render(): void {
@@ -32,11 +61,21 @@ export class TodayPanel extends BasePanel {
     const items: string[] = [];
     const taskObjects: any[] = [];
 
-    // Calculate total time logged for all tasks
+    const worklogsHash = JSON.stringify(state.worklogs);
+    const worklogsChanged = worklogsHash !== this.lastWorklogsHash;
+    
+    if (worklogsChanged) {
+      this.timeLoggedCache.clear();
+      this.lastWorklogsHash = worklogsHash;
+    }
+
     let totalSeconds = 0;
 
-    // Helper function to get time logged for a task
     const getTimeLogged = (taskKey: string): number => {
+      if (this.timeLoggedCache.has(taskKey)) {
+        return this.timeLoggedCache.get(taskKey)!;
+      }
+
       const worklogs = state.worklogs || {};
       let taskSeconds = 0;
       
@@ -50,10 +89,10 @@ export class TodayPanel extends BasePanel {
         }
       });
       
+      this.timeLoggedCache.set(taskKey, taskSeconds);
       return taskSeconds;
     };
 
-    // Helper function to format time badge
     const formatTimeBadge = (seconds: number): string => {
       if (seconds === 0) {
         return '';
@@ -71,45 +110,54 @@ export class TodayPanel extends BasePanel {
     const todayTasks = state.tasks.inProgress;
     const yesterdayTasks = state.tasks.yesterday;
 
-    // Add today tasks
     todayTasks.forEach((task) => {
       const key = task.key || task.id;
       const timeLogged = getTimeLogged(key);
       totalSeconds += timeLogged;
       
-      const formatted = formatTaskItem({
-        key: `To - ${key}`,
-        summary: task.fields.summary,
-        issuetype: task.fields?.issuetype?.name || 'Task',
-        priority: task.fields?.priority?.name,
-        status: task.fields?.status?.name,
-      });
+      const cacheKey = `To-${key}`;
+      let formatted = this.formattedItemCache.get(cacheKey);
+      
+      if (!formatted) {
+        formatted = formatTaskItem({
+          key: `To - ${key}`,
+          summary: task.fields.summary,
+          issuetype: task.fields?.issuetype?.name || 'Task',
+          priority: task.fields?.priority?.name,
+          status: task.fields?.status?.name,
+        });
+        this.formattedItemCache.set(cacheKey, formatted);
+      }
       
       const timeBadge = formatTimeBadge(timeLogged);
       items.push(formatted + timeBadge);
       taskObjects.push(task);
     });
 
-    // Add yesterday tasks
     yesterdayTasks.forEach((task) => {
       const key = task.key || task.id;
       const timeLogged = getTimeLogged(key);
       totalSeconds += timeLogged;
       
-      const formatted = formatTaskItem({
-        key: `Ye - ${key}`,
-        summary: task.fields.summary,
-        issuetype: task.fields?.issuetype?.name || 'Task',
-        priority: task.fields?.priority?.name,
-        status: task.fields?.status?.name,
-      });
+      const cacheKey = `Ye-${key}`;
+      let formatted = this.formattedItemCache.get(cacheKey);
+      
+      if (!formatted) {
+        formatted = formatTaskItem({
+          key: `Ye - ${key}`,
+          summary: task.fields.summary,
+          issuetype: task.fields?.issuetype?.name || 'Task',
+          priority: task.fields?.priority?.name,
+          status: task.fields?.status?.name,
+        });
+        this.formattedItemCache.set(cacheKey, formatted);
+      }
       
       const timeBadge = formatTimeBadge(timeLogged);
       items.push(formatted + timeBadge);
       taskObjects.push(task);
     });
 
-    // Enhanced empty state
     if (todayTasks.length === 0 && yesterdayTasks.length === 0) {
       items.push('');
       items.push('{center}{gray-fg}╭────────────────────╮{/gray-fg}{/center}');
@@ -125,10 +173,8 @@ export class TodayPanel extends BasePanel {
 
     this.widget.setItems(items);
 
-    // Update state items for navigation
     this.state.getState().panels.today.items = taskObjects;
 
-    // Update selection
     const selectedIndex = this.state.getState().panels.today.selectedIndex;
     if (taskObjects.length > 0) {
       const validIndex = Math.min(selectedIndex, taskObjects.length - 1);
@@ -138,7 +184,6 @@ export class TodayPanel extends BasePanel {
       this.widget.select(validIndex);
     }
 
-    // Update label with task count and total time
     const totalHours = totalSeconds / 3600;
     let statsText = '';
     if (totalSeconds > 0) {

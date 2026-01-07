@@ -16,6 +16,7 @@ interface JiraIssue {
 
 export class TodoPanel extends BasePanel {
   private onSelectCallback?: (task: any) => Promise<void>;
+  private formattedItemCache: Map<string, string> = new Map();
 
   constructor(
     grid: any,
@@ -25,40 +26,63 @@ export class TodoPanel extends BasePanel {
   ) {
     super(grid, state, 'todo', position, '');
     this.onSelectCallback = onSelectCallback;
+    this.overrideSubscribe();
+  }
+
+  private overrideSubscribe(): void {
+    (this as any).subscribe = () => {
+      this.state.subscribe((state, changedKeys) => {
+        if (!changedKeys) {
+          this.render();
+          return;
+        }
+
+        const shouldRender = changedKeys.has('*') ||
+          changedKeys.has('tasks') ||
+          changedKeys.has('tasks.open') ||
+          changedKeys.has('panels.todo');
+
+        if (shouldRender) {
+          this.render();
+        }
+      });
+    };
   }
 
   render(): void {
     const state = this.state.getState();
     const items: string[] = [];
-    const tasks = state.tasks.open;  // Show all open tasks
+    const tasks = state.tasks.open;
 
-    // Enhanced empty state
     if (tasks.length === 0) {
       items.push('');
       items.push('{center}{gray-fg}╭────────────────────╮{/gray-fg}{/center}');
       items.push('{center}{white-fg}│  📝 No Open Tasks  │{/white-fg}{/center}');
       items.push('{center}{gray-fg}╰────────────────────╯{/gray-fg}{/center}');
     } else {
-      // Show all tasks (high priority tasks already have visual indicators from formatTaskItem)
       tasks.forEach((task) => {
         const key = task.key || task.id;
-        const formatted = formatTaskItem({
-          key: key,  // Removed 'To - ' prefix
-          summary: task.fields.summary,
-          issuetype: task.fields?.issuetype?.name || 'Task',
-          priority: task.fields?.priority?.name,
-          status: task.fields?.status?.name,
-        });
+        let formatted = this.formattedItemCache.get(key);
+        
+        if (!formatted) {
+          formatted = formatTaskItem({
+            key: key,
+            summary: task.fields.summary,
+            issuetype: task.fields?.issuetype?.name || 'Task',
+            priority: task.fields?.priority?.name,
+            status: task.fields?.status?.name,
+          });
+          this.formattedItemCache.set(key, formatted);
+        }
+        
         items.push(formatted);
       });
     }
 
     this.widget.setItems(items);
 
-    // Update state items for navigation
     this.state.getState().panels.todo.items = tasks;
 
-    // Update selection
     const selectedIndex = this.state.getState().panels.todo.selectedIndex;
     if (tasks.length > 0) {
       const validIndex = Math.min(selectedIndex, tasks.length - 1);
@@ -68,7 +92,6 @@ export class TodoPanel extends BasePanel {
       this.widget.select(validIndex);
     }
 
-    // Update label with task count
     this.updateLabelWithStats('Todo');
 
     this.widget.screen.render();

@@ -16,6 +16,7 @@ interface JiraIssue {
 
 export class TestingPanel extends BasePanel {
   private onSelectCallback?: (task: any) => Promise<void>;
+  private formattedItemCache: Map<string, string> = new Map();
 
   constructor(
     grid: any,
@@ -25,6 +26,28 @@ export class TestingPanel extends BasePanel {
   ) {
     super(grid, state, 'testing', position, '');
     this.onSelectCallback = onSelectCallback;
+    this.overrideSubscribe();
+  }
+
+  private overrideSubscribe(): void {
+    (this as any).subscribe = () => {
+      this.state.subscribe((state, changedKeys) => {
+        if (!changedKeys) {
+          this.render();
+          return;
+        }
+
+        const shouldRender = changedKeys.has('*') ||
+          changedKeys.has('tasks') ||
+          changedKeys.has('tasks.underReview') ||
+          changedKeys.has('tasks.readyForTesting') ||
+          changedKeys.has('panels.testing');
+
+        if (shouldRender) {
+          this.render();
+        }
+      });
+    };
   }
 
   render(): void {
@@ -35,35 +58,46 @@ export class TestingPanel extends BasePanel {
     const underReviewTasks = state.tasks.underReview;
     const readyForTestingTasks = state.tasks.readyForTesting;
 
-    // Add under review tasks
     underReviewTasks.forEach((task) => {
       const key = task.key || task.id;
-      const formatted = formatTaskItem({
-        key: `Rev - ${key}`,
-        summary: task.fields.summary,
-        issuetype: task.fields?.issuetype?.name || 'Task',
-        priority: task.fields?.priority?.name,
-        status: task.fields?.status?.name,
-      });
+      const cacheKey = `Rev-${key}`;
+      let formatted = this.formattedItemCache.get(cacheKey);
+      
+      if (!formatted) {
+        formatted = formatTaskItem({
+          key: `Rev - ${key}`,
+          summary: task.fields.summary,
+          issuetype: task.fields?.issuetype?.name || 'Task',
+          priority: task.fields?.priority?.name,
+          status: task.fields?.status?.name,
+        });
+        this.formattedItemCache.set(cacheKey, formatted);
+      }
+      
       items.push(formatted);
       taskObjects.push(task);
     });
 
-    // Add ready for testing tasks
     readyForTestingTasks.forEach((task) => {
       const key = task.key || task.id;
-      const formatted = formatTaskItem({
-        key: `QA - ${key}`,
-        summary: task.fields.summary,
-        issuetype: task.fields?.issuetype?.name || 'Task',
-        priority: task.fields?.priority?.name,
-        status: task.fields?.status?.name,
-      });
+      const cacheKey = `QA-${key}`;
+      let formatted = this.formattedItemCache.get(cacheKey);
+      
+      if (!formatted) {
+        formatted = formatTaskItem({
+          key: `QA - ${key}`,
+          summary: task.fields.summary,
+          issuetype: task.fields?.issuetype?.name || 'Task',
+          priority: task.fields?.priority?.name,
+          status: task.fields?.status?.name,
+        });
+        this.formattedItemCache.set(cacheKey, formatted);
+      }
+      
       items.push(formatted);
       taskObjects.push(task);
     });
 
-    // Enhanced empty state
     if (underReviewTasks.length === 0 && readyForTestingTasks.length === 0) {
       items.push('');
       items.push('{center}{gray-fg}╭──────────────────────╮{/gray-fg}{/center}');
@@ -78,10 +112,8 @@ export class TestingPanel extends BasePanel {
 
     this.widget.setItems(items);
 
-    // Update state items for navigation
     this.state.getState().panels.testing.items = taskObjects;
 
-    // Update selection
     const selectedIndex = this.state.getState().panels.testing.selectedIndex;
     if (taskObjects.length > 0) {
       const validIndex = Math.min(selectedIndex, taskObjects.length - 1);
@@ -91,7 +123,6 @@ export class TestingPanel extends BasePanel {
       this.widget.select(validIndex);
     }
 
-    // Update label with task count
     this.updateLabelWithStats('Testing');
 
     this.widget.screen.render();

@@ -274,9 +274,9 @@ export abstract class BasePanel {
       
       // Update selected item colors
       if (newStyle.selected) {
-        if (newStyle.selected.fg) this.widget.style.selected.fg = newStyle.selected.fg;
-        if (newStyle.selected.bg) this.widget.style.selected.bg = newStyle.selected.bg;
-        if (newStyle.selected.bold !== undefined) this.widget.style.selected.bold = newStyle.selected.bold;
+        if (newStyle.selected.fg) {this.widget.style.selected.fg = newStyle.selected.fg;}
+        if (newStyle.selected.bg) {this.widget.style.selected.bg = newStyle.selected.bg;}
+        if (newStyle.selected.bold !== undefined) {this.widget.style.selected.bold = newStyle.selected.bold;}
       }
       
       // Ensure item object exists
@@ -286,8 +286,8 @@ export abstract class BasePanel {
       
       // Update item colors
       if (newStyle.item) {
-        if (newStyle.item.fg) this.widget.style.item.fg = newStyle.item.fg;
-        if (newStyle.item.bg) this.widget.style.item.bg = newStyle.item.bg;
+        if (newStyle.item.fg) {this.widget.style.item.fg = newStyle.item.fg;}
+        if (newStyle.item.bg) {this.widget.style.item.bg = newStyle.item.bg;}
       }
     }
 
