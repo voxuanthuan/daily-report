@@ -299,8 +299,8 @@ const SOLARIZED_LIGHT_THEME: ThemeColors = {
   textSecondary: '#657b83',    // Base00 (secondary text)
 };
 
-// Current active theme
-let currentTheme: ThemeColors = DARK_THEME;
+// Current active theme - explicitly initialized to prevent undefined access
+let currentTheme: ThemeColors = { ...DARK_THEME };
 let currentMode: ThemeMode = 'dark';
 
 // Theme change listeners
@@ -349,7 +349,14 @@ export function setTheme(mode: ThemeMode): void {
 
 export function getTheme(): ThemeColors {
   // Defensive check: ensure theme is always initialized with all required properties
-  if (!currentTheme || !currentTheme.fg || !currentTheme.bg) {
+  // Check multiple critical properties to ensure complete initialization
+  if (!currentTheme ||
+      !currentTheme.fg ||
+      !currentTheme.bg ||
+      !currentTheme.focused ||
+      !currentTheme.unfocused ||
+      !currentTheme.selectedBg ||
+      !currentTheme.selectedFg) {
     currentTheme = DARK_THEME;
   }
   return currentTheme;
@@ -411,57 +418,65 @@ export function getBoxStyle(focused: boolean): Widgets.BoxOptions['style'] {
 
 export function getListStyle(focused: boolean): Widgets.ListOptions<any>['style'] {
   const theme = getTheme(); // Use getTheme() to ensure theme is always initialized
-  
+
+  // Additional safety: ensure theme object has all required properties
+  const safeFg = theme?.fg || 'white';
+  const safeBg = theme?.bg || 'black';
+  const safeFocused = theme?.focused || '#61afef';
+  const safeUnfocused = theme?.unfocused || '#5c6370';
+  const safeSelectedBg = theme?.selectedBg || '#2c323c';
+  const safeSelectedFg = theme?.selectedFg || '#e2b714';
+
   if (focused) {
     return {
       selected: {
-        bg: theme?.selectedBg || '#2c323c',
-        fg: theme?.selectedFg || '#e2b714',
+        bg: safeSelectedBg,
+        fg: safeSelectedFg,
         bold: true,
         underline: false,
         inverse: false,
       },
       item: {
-        fg: theme?.fg || 'white',
+        fg: safeFg,
         bg: 'transparent',
       },
       border: {
-        fg: theme?.focused || '#61afef',
+        fg: safeFocused,
         bold: false,
       },
       focus: {
         border: {
-          fg: theme?.focused || '#61afef',
+          fg: safeFocused,
           bold: false,
         },
         selected: {
-          bg: theme?.selectedBg || '#2c323c',
-          fg: theme?.selectedFg || '#e2b714',
+          bg: safeSelectedBg,
+          fg: safeSelectedFg,
           bold: true,
           underline: false,
           inverse: false,
         },
       },
-      fg: theme?.fg || 'white',
+      fg: safeFg,
       bg: 'transparent',
     };
   } else {
     return {
       selected: {
         bg: 'transparent',
-        fg: theme?.fg || 'white',
+        fg: safeFg,
         bold: false,
         underline: false,
         inverse: false,
       },
       item: {
-        fg: theme?.fg || 'white',
+        fg: safeFg,
         bg: 'transparent',
       },
       border: {
-        fg: theme?.unfocused || '#5c6370',
+        fg: safeUnfocused,
       },
-      fg: theme?.fg || 'white',
+      fg: safeFg,
       bg: 'transparent',
     };
   }
