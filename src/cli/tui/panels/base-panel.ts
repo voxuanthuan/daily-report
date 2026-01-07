@@ -244,19 +244,50 @@ export abstract class BasePanel {
     this.focused = focused;
     const newStyle = getListStyle(focused);
 
-    // Critical safety: Only update style if newStyle is fully defined
-    // This prevents blessed from crashing on undefined properties
-    if (newStyle && newStyle.border && newStyle?.fg && newStyle?.selected && newStyle?.item) {
-      this.widget.style = newStyle;
-      
-      // Ensure border object exists before accessing its properties
+    // Critical safety: Update style properties IN-PLACE instead of replacing the entire object
+    // This prevents blessed from accessing stale/undefined references
+    if (newStyle && this.widget.style) {
+      // Ensure border object exists
       if (!this.widget.style.border) {
         this.widget.style.border = {};
       }
       
-      // Explicitly update border color to ensure it changes with null safety
-      if (newStyle.border && newStyle.border.fg) {
+      // Update border color
+      if (newStyle.border?.fg) {
         this.widget.style.border.fg = newStyle.border.fg;
+      }
+      
+      // Update foreground color
+      if (newStyle.fg) {
+        this.widget.style.fg = newStyle.fg;
+      }
+      
+      // Update background color
+      if (newStyle.bg !== undefined) {
+        this.widget.style.bg = newStyle.bg;
+      }
+      
+      // Ensure selected object exists
+      if (!this.widget.style.selected) {
+        this.widget.style.selected = {};
+      }
+      
+      // Update selected item colors
+      if (newStyle.selected) {
+        if (newStyle.selected.fg) this.widget.style.selected.fg = newStyle.selected.fg;
+        if (newStyle.selected.bg) this.widget.style.selected.bg = newStyle.selected.bg;
+        if (newStyle.selected.bold !== undefined) this.widget.style.selected.bold = newStyle.selected.bold;
+      }
+      
+      // Ensure item object exists
+      if (!this.widget.style.item) {
+        this.widget.style.item = {};
+      }
+      
+      // Update item colors
+      if (newStyle.item) {
+        if (newStyle.item.fg) this.widget.style.item.fg = newStyle.item.fg;
+        if (newStyle.item.bg) this.widget.style.item.bg = newStyle.item.bg;
       }
     }
 

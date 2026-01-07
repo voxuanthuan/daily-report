@@ -333,24 +333,27 @@ function detectSystemTheme(): 'dark' | 'light' {
 }
 
 export function setTheme(mode: ThemeMode): void {
+  console.log(`[THEME] setTheme called with mode: ${mode}`);
   currentMode = mode;
 
   // Resolve 'auto' mode
   if (mode === 'auto') {
     const systemTheme = detectSystemTheme();
     // Use Solarized themes for auto-detection
-    currentTheme = systemTheme === 'light' ? SOLARIZED_LIGHT_THEME : SOLARIZED_DARK_THEME;
+    currentTheme = Object.assign({}, systemTheme === 'light' ? SOLARIZED_LIGHT_THEME : SOLARIZED_DARK_THEME);
   } else if (mode === 'solarized') {
-    currentTheme = SOLARIZED_DARK_THEME;
+    currentTheme = Object.assign({}, SOLARIZED_DARK_THEME);
   } else if (mode === 'solarized-light') {
-    currentTheme = SOLARIZED_LIGHT_THEME;
+    currentTheme = Object.assign({}, SOLARIZED_LIGHT_THEME);
   } else if (mode === 'dracula') {
-    currentTheme = DRACULA_THEME;
+    currentTheme = Object.assign({}, DRACULA_THEME);
   } else if (mode === 'light') {
-    currentTheme = LIGHT_THEME;
+    currentTheme = Object.assign({}, LIGHT_THEME);
   } else {
-    currentTheme = DARK_THEME;
+    currentTheme = Object.assign({}, DARK_THEME);
   }
+  
+  console.log(`[THEME] Theme set. fg=${currentTheme.fg}, bg=${currentTheme.bg}`);
 
   // Notify listeners of theme change (but not during initialization)
   if (!isInitializing) {
@@ -375,7 +378,8 @@ export function getTheme(): ThemeColors {
       !currentTheme.unfocused ||
       !currentTheme.selectedBg ||
       !currentTheme.selectedFg) {
-    currentTheme = DARK_THEME;
+    console.log('[THEME] WARNING: Theme not properly initialized, using DARK_THEME fallback');
+    currentTheme = Object.assign({}, DARK_THEME);
   }
   return currentTheme;
 }

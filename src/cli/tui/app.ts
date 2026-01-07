@@ -46,6 +46,9 @@ export class TUIApp {
   private loadingIndicator: NodeJS.Timeout | null = null;
 
   constructor(screen: blessed.Widgets.Screen, configManager: ConfigManager) {
+    // CRITICAL: Initialize theme BEFORE creating panels to prevent undefined theme access
+    setTheme('dark');
+    
     this.screen = screen;
     this.configManager = configManager;
     this.state = new StateManager();
