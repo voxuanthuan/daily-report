@@ -299,6 +299,9 @@ export class TUIApp {
       this.state.setThemeMode(themeMode);
     } catch (error) {
       console.warn('Failed to load theme from config, using default:', error);
+      // CRITICAL: Always set a default theme when config fails to prevent undefined theme state
+      setTheme('dark');
+      this.state.setThemeMode('dark');
     }
   }
 
