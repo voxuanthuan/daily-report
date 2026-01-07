@@ -397,15 +397,15 @@ export const COLORS = currentTheme;
 export function getBoxStyle(focused: boolean): Widgets.BoxOptions['style'] {
   return {
     border: {
-      fg: focused ? currentTheme?.focused : currentTheme?.border,
+      fg: (focused ? currentTheme?.focused : currentTheme?.border) || '#5c6370',
     },
     focus: {
       border: {
-        fg: currentTheme?.focused,
+        fg: currentTheme?.focused || '#61afef',
       },
     },
-    bg: currentTheme?.bg,
-    fg: currentTheme?.fg,
+    bg: currentTheme?.bg || 'black',
+    fg: currentTheme?.fg || 'white',
   };
 }
 
@@ -415,56 +415,53 @@ export function getListStyle(focused: boolean): Widgets.ListOptions<any>['style'
   if (focused) {
     return {
       selected: {
-        bg: theme?.selectedBg,
-        fg: theme?.selectedFg,
-        bold: true,  // Bold for selected item
+        bg: theme?.selectedBg || '#2c323c',
+        fg: theme?.selectedFg || '#e2b714',
+        bold: true,
         underline: false,
         inverse: false,
       },
       item: {
-        fg: theme?.fg,
-        bg: 'transparent',  // Transparent background
+        fg: theme?.fg || 'white',
+        bg: 'transparent',
       },
       border: {
-        fg: theme?.focused,
+        fg: theme?.focused || '#61afef',
         bold: false,
       },
       focus: {
         border: {
-          fg: theme?.focused,
+          fg: theme?.focused || '#61afef',
           bold: false,
         },
         selected: {
-          bg: theme?.selectedBg,
-          fg: theme?.selectedFg,
-          bold: true,  // Bold for selected item
+          bg: theme?.selectedBg || '#2c323c',
+          fg: theme?.selectedFg || '#e2b714',
+          bold: true,
           underline: false,
           inverse: false,
         },
       },
-      // Set transparent background for the entire list
-      fg: theme?.fg,
+      fg: theme?.fg || 'white',
       bg: 'transparent',
     };
   } else {
-    // Unfocused panels: no highlighting, just normal text
     return {
       selected: {
-        bg: 'transparent',  // No highlight
-        fg: theme?.fg,  // Same as normal text - no highlight
-        bold: false,   // Not bold when unfocused
+        bg: 'transparent',
+        fg: theme?.fg || 'white',
+        bold: false,
         underline: false,
         inverse: false,
       },
       item: {
-        fg: theme?.fg,
-        bg: 'transparent',  // Transparent background
+        fg: theme?.fg || 'white',
+        bg: 'transparent',
       },
       border: {
-        fg: theme?.unfocused,
+        fg: theme?.unfocused || '#5c6370',
       },
-      // Set transparent background for the entire list
-      fg: theme?.fg,
+      fg: theme?.fg || 'white',
       bg: 'transparent',
     };
   }

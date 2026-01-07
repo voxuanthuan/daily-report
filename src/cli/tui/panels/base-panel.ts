@@ -191,25 +191,25 @@ export abstract class BasePanel {
     // Explicitly update all style properties for blessed to recognize changes
     if (this.widget.style) {
       // Update border color with null safety
-      if (this.widget.style.border && newStyle.border && newStyle.border.fg) {
+      if (this.widget.style.border && newStyle.border && newStyle?.border?.fg) {
         this.widget.style.border.fg = newStyle.border.fg;
       }
       
       // Update foreground (text) color with null safety
-      if (newStyle.fg) {
+      if (newStyle?.fg) {
         this.widget.style.fg = newStyle.fg;
       }
       
       // Background is transparent - not set
       
       // Update selected item colors with null safety
-      if (this.widget.style.selected && newStyle.selected && newStyle.selected.fg && newStyle.selected.bg) {
+      if (this.widget.style.selected && newStyle.selected && newStyle?.selected?.fg && newStyle?.selected?.bg) {
         this.widget.style.selected.fg = newStyle.selected.fg;
         this.widget.style.selected.bg = newStyle.selected.bg;
       }
       
       // Update item colors with null safety
-      if (this.widget.style.item && newStyle.item && newStyle.item.fg && newStyle.item.bg) {
+      if (this.widget.style.item && newStyle.item && newStyle?.item?.fg && newStyle?.item?.bg) {
         this.widget.style.item.fg = newStyle.item.fg;
         this.widget.style.item.bg = newStyle.item.bg;
       }
@@ -239,12 +239,15 @@ export abstract class BasePanel {
     this.focused = focused;
     const newStyle = getListStyle(focused);
 
-    // Update the full style
-    this.widget.style = newStyle;
-
-    // Explicitly update border color to ensure it changes with null safety
-    if (this.widget.style.border && newStyle.border && newStyle.border.fg) {
-      this.widget.style.border.fg = newStyle.border.fg;
+    // Critical safety: Only update style if newStyle is fully defined
+    // This prevents blessed from crashing on undefined properties
+    if (newStyle && newStyle.border && newStyle?.fg && newStyle?.selected && newStyle?.item) {
+      this.widget.style = newStyle;
+      
+      // Explicitly update border color to ensure it changes with null safety
+      if (this.widget.style.border && newStyle.border && newStyle.border.fg) {
+        this.widget.style.border.fg = newStyle.border.fg;
+      }
     }
 
     if (focused) {
