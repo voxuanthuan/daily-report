@@ -345,7 +345,6 @@ function detectSystemTheme(): 'dark' | 'light' {
 }
 
 export function setTheme(mode: ThemeMode): void {
-  console.log(`[THEME] setTheme called with mode: ${mode}`);
   currentMode = mode;
 
   // Resolve 'auto' mode
@@ -364,8 +363,6 @@ export function setTheme(mode: ThemeMode): void {
   } else {
     currentTheme = Object.assign({}, DARK_THEME);
   }
-  
-  console.log(`[THEME] Theme set. fg=${currentTheme.fg}, bg=${currentTheme.bg}`);
 
   // Notify listeners of theme change (but not during initialization)
   if (!isInitializing) {
@@ -390,7 +387,6 @@ export function getTheme(): ThemeColors {
       !currentTheme.unfocused ||
       !currentTheme.selectedBg ||
       !currentTheme.selectedFg) {
-    console.log('[THEME] WARNING: Theme not properly initialized, using DARK_THEME fallback');
     currentTheme = Object.assign({}, DARK_THEME);
   }
   return currentTheme;
