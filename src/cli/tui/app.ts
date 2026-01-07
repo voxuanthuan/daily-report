@@ -14,7 +14,7 @@ import { ChangeStatusAction } from './actions/change-status';
 import { fetchAllTasks, fetchUserDisplayName, extractPreviousWorkdayTasks, clearCaches } from '../../core/task-fetcher';
 import TempoFetcher from '../../core/tempo/fetcher';
 import { CacheManager, RequestDeduplicator, debounce } from './utils/cache';
-import { getTheme, setTheme, getCurrentThemeMode, onThemeChange, ThemeMode } from './theme';
+import { getTheme, setTheme, getCurrentThemeMode, onThemeChange, markThemeInitialized, ThemeMode } from './theme';
 import { applyRoundedCorners } from './utils/rounded-corners';
 
 export class TUIApp {
@@ -278,6 +278,8 @@ export class TUIApp {
   async initialize(): Promise<void> {
     try {
       await this.loadThemeFromConfig();
+      // Mark theme as initialized so listeners can fire on subsequent changes
+      markThemeInitialized();
       await this.loadInitialData();
       this.state.setFocusedPanel('today');
       this.renderAllPanels();

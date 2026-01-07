@@ -303,13 +303,14 @@ const SOLARIZED_LIGHT_THEME: ThemeColors = {
 // Using Object.assign for better compatibility with bundlers
 let currentTheme: ThemeColors = Object.assign({}, DARK_THEME);
 let currentMode: ThemeMode = 'dark';
+let isInitializing: boolean = true; // Flag to prevent renders during initialization
 
 // Theme change listeners
 const themeChangeListeners: Set<() => void> = new Set();
 
 // Initialize theme immediately at module load to prevent any undefined access
 (function initializeTheme() {
-  if (!currentTheme ||!currentTheme.fg) {
+  if (!currentTheme ||!currentTheme?.fg) {
     currentTheme = Object.assign({}, DARK_THEME);
   }
 })();
@@ -351,8 +352,17 @@ export function setTheme(mode: ThemeMode): void {
     currentTheme = DARK_THEME;
   }
 
-  // Notify listeners of theme change
-  themeChangeListeners.forEach(listener => listener());
+  // Notify listeners of theme change (but not during initialization)
+  if (!isInitializing) {
+    themeChangeListeners.forEach(listener => listener());
+  }
+}
+
+/**
+ * Mark theme initialization as complete - allows theme change listeners to fire
+ */
+export function markThemeInitialized(): void {
+  isInitializing = false;
 }
 
 export function getTheme(): ThemeColors {
