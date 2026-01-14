@@ -1,0 +1,123 @@
+package tui
+
+import (
+	"fmt"
+
+	"github.com/jroimartin/gocui"
+)
+
+// showLogTimeModal shows the log time modal as an overlapping view
+func (gui *Gui) showLogTimeModal(g *gocui.Gui, v *gocui.View) error {
+	// Get selected task
+	var tasks []interface{}
+	var idx int
+
+	switch gui.state.ActivePanel {
+	case PanelReport:
+		for _, t := range gui.state.ReportTasks {
+			tasks = append(tasks, t)
+		}
+		idx = gui.state.SelectedIndices[PanelReport]
+	case PanelTodo:
+		for _, t := range gui.state.TodoTasks {
+			tasks = append(tasks, t)
+		}
+		idx = gui.state.SelectedIndices[PanelTodo]
+	case PanelProcessing:
+		for _, t := range gui.state.ProcessingTasks {
+			tasks = append(tasks, t)
+		}
+		idx = gui.state.SelectedIndices[PanelProcessing]
+	default:
+		gui.state.StatusMessage = "No task panel selected"
+		return nil
+	}
+
+	if len(tasks) == 0 || idx >= len(tasks) {
+		gui.state.StatusMessage = "No task selected"
+		return nil
+	}
+
+	maxX, maxY := g.Size()
+
+	// Modal dimensions - compact like we had before
+	modalWidth := 44
+	modalHeight := 10
+
+	// Center the modal
+	x0 := (maxX - modalWidth) / 2
+	y0 := (maxY - modalHeight) / 2
+	x1 := x0 + modalWidth
+	y1 := y0 + modalHeight
+
+	// Create modal view
+	if v, err := g.SetView("modal", x0, y0, x1, y1); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		v.Title = " Log Time "
+		v.Wrap = true
+		v.Frame = true
+
+		// Render modal content
+		fmt.Fprintln(v, "")
+		fmt.Fprintln(v, "  ▶ Log time (quick - today only)")
+		fmt.Fprintln(v, "    Log time with description")
+		fmt.Fprintln(v, "    Log time with date & description")
+		fmt.Fprintln(v, "")
+		fmt.Fprintln(v, "  [↑↓/jk] Navigate  [Enter] Select")
+		fmt.Fprintln(v, "  [ESC] Cancel")
+	}
+
+	// Set modal on top and make it current
+	if _, err := g.SetViewOnTop("modal"); err != nil {
+		return err
+	}
+	if _, err := g.SetCurrentView("modal"); err != nil {
+		return err
+	}
+
+	// Set keybindings for modal
+	if err := g.SetKeybinding("modal", gocui.KeyEsc, gocui.ModNone, gui.closeModal); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("modal", 'q', gocui.ModNone, gui.closeModal); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// closeModal closes and removes the modal view
+func (gui *Gui) closeModal(g *gocui.Gui, v *gocui.View) error {
+	// Delete the modal view
+	if err := g.DeleteView("modal"); err != nil {
+		return err
+	}
+
+	// Delete modal keybindings
+	g.DeleteKeybinding("modal", gocui.KeyEsc, gocui.ModNone)
+	g.DeleteKeybinding("modal", 'q', gocui.ModNone)
+
+	// Return to the previous panel
+	switch gui.state.ActivePanel {
+	case PanelReport:
+		if _, err := g.SetCurrentView("report"); err != nil {
+			return err
+		}
+	case PanelTodo:
+		if _, err := g.SetCurrentView("todo"); err != nil {
+			return err
+		}
+	case PanelProcessing:
+		if _, err := g.SetCurrentView("processing"); err != nil {
+			return err
+		}
+	case PanelTimelog:
+		if _, err := g.SetCurrentView("timelog"); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
