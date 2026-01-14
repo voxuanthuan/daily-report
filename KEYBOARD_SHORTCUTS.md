@@ -75,3 +75,41 @@ All commands are also available via Command Palette:
 - `Ctrl+Shift+P` → Type command name
 - No keyboard shortcut required
 - Works even if shortcuts are disabled
+
+## TUI Navigation (Terminal Interface)
+
+When using the TUI mode (`jira-daily-report tui`), these shortcuts are available:
+
+### Panel Shortcuts
+- **`1`** - Today panel (in-progress tasks)
+- **`2`** - Todo panel (open and ready tasks)
+- **`3`** - Testing panel (ready for testing tasks)
+- **`4`** - Time Tracking panel (weekly hours summary)
+- **`h`** / **`l`** - Navigate previous/next panel (vim-style)
+- **`Tab`** - Cycle forward through panels
+
+### Within Panels
+- **`j`** / **`k`** or **`↓`** / **`↑`** - Navigate items up/down (vim-style)
+- **`g`** / **`G`** - Go to first/last item
+- **`Ctrl+f`** / **`Ctrl+b`** - Page down/up
+- **`Enter`** or **`o`** - Select/open item in browser
+- **`i`** - Log time menu (quick/description/full)
+- **`s`** - Change task status
+- **`y`** - Copy menu (full ticket/ID/description)
+- **`c`** - Copy daily standup report
+- **`r`** - Refresh all data
+- **`v`** - View task images (in Details panel)
+- **`a`** - Show actions menu
+- **`q`** - Quit TUI
+- **`Ctrl+?`** - Toggle help overlay
+- **`Ctrl+T`** - Change theme
+
+### Time Tracking Panel Features (Press `0`)
+The Time Tracking panel shows all your logged work with:
+- Tasks grouped by issue key
+- Each worklog entry showing:
+  - Date logged
+  - Hours spent
+  - Description (if provided)
+- Total hours at the bottom
+- Navigate with j/k keys to browse all entries

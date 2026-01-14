@@ -45,7 +45,7 @@ export interface PanelState {
   items: any[];
 }
 
-export type PanelType = 'today' | 'todo' | 'testing' | 'details';
+export type PanelType = 'today' | 'todo' | 'testing' | 'details' | 'timelog';
 
 export interface TUIState {
   panels: {
@@ -53,6 +53,7 @@ export interface TUIState {
     todo: PanelState;
     testing: PanelState;
     details: PanelState;
+    timelog: PanelState;
   };
   focusedPanel: PanelType;
   tasks: {
@@ -100,6 +101,7 @@ export class StateManager {
         todo: { selectedIndex: 0, scrollOffset: 0, items: [] },
         testing: { selectedIndex: 0, scrollOffset: 0, items: [] },
         details: { selectedIndex: 0, scrollOffset: 0, items: [] },
+        timelog: { selectedIndex: 0, scrollOffset: 0, items: [] },
       },
       focusedPanel: 'today',
       tasks: {
@@ -312,6 +314,22 @@ export class StateManager {
     const panel = this.state.focusedPanel;
     if (panel === 'today' || panel === 'testing' || panel === 'todo') {
       return this.getSelectedItem(panel);
+    }
+    // For timelog panel, return the first task from the selected date group
+    // (Details panel will handle showing all worklogs for that date)
+    if (panel === 'timelog') {
+      const selectedDateGroup = this.getSelectedItem(panel);
+      if (selectedDateGroup && selectedDateGroup.worklogs && selectedDateGroup.worklogs.length > 0) {
+        const firstLog = selectedDateGroup.worklogs[0];
+        return {
+          id: firstLog.task.id,
+          key: firstLog.task.key,
+          fields: {
+            summary: firstLog.task.summary,
+            status: { name: 'Unknown' },
+          }
+        } as JiraIssue;
+      }
     }
     return null;
   }

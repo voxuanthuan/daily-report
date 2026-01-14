@@ -1,4 +1,5 @@
 import blessed from 'neo-blessed';
+import axios from 'axios';
 import { ConfigManager } from '../../core/config';
 import { StateManager, PanelType } from './state';
 import { Layout } from './layout';
@@ -36,7 +37,7 @@ export class TUIApp {
     logTime: LogTimeAction;
     changeStatus: ChangeStatusAction;
   };
-  private panelOrder: PanelType[] = ['today', 'todo', 'testing'];  // Navigable panels (Details excluded)
+  private panelOrder: PanelType[] = ['today', 'todo', 'testing', 'timelog'];  // Navigable panels (Details excluded)
   private helpOverlay: blessed.Widgets.BoxElement | null = null;
   
   // Performance optimization
@@ -156,8 +157,8 @@ export class TUIApp {
       this.state.setFocusedPanel('testing');
     });
 
-    this.screen.key(['0'], () => {
-      this.state.setFocusedPanel('details');
+    this.screen.key(['4'], () => {
+      this.state.setFocusedPanel('timelog');
     });
 
     this.screen.key(['r', 'R'], async () => {
@@ -245,6 +246,8 @@ export class TUIApp {
             this.panels.todo.render();
           } else if (key.startsWith('panels.details')) {
             this.panels.details.render();
+          } else if (key.startsWith('panels.timelog')) {
+            this.panels.timelog.render();
           } else if (key === 'tasks' || key === 'worklogs' || key === 'tasksWithWorklogs') {
             this.renderAllPanels();
           } else if (key === 'statusMessage' || key === 'loading') {
@@ -351,6 +354,26 @@ export class TUIApp {
         worklogs = await this.requestDeduplicator.execute('fetchWorklogs', () =>
           fetcher.fetchLastSixDaysWorklogs()
         );
+        
+        // Enrich worklogs with issue details from Jira API
+        this.state.setStatusMessage('Enriching worklogs with issue details...');
+        const jiraUrl = await this.configManager.getJiraServer();
+        const jiraEmail = await this.configManager.getUsername();
+        const jiraApiToken = await this.configManager.getApiToken();
+        
+        const jiraAxios = axios.create({
+          baseURL: jiraUrl,
+          auth: {
+            username: jiraEmail,
+            password: jiraApiToken
+          },
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        worklogs = await fetcher.enrichWorklogsWithIssueDetails(worklogs, jiraAxios);
+        
         this.cacheManager.set('worklogs', worklogs, 120000); // 2 minutes
       }
 
@@ -390,7 +413,6 @@ export class TUIApp {
     this.panels.status.render();
     this.panels.timelog.render();
   }
-
   async refresh(): Promise<void> {
     this.showLoadingIndicator();
     try {
@@ -743,8 +765,10 @@ export class TUIApp {
     // Build standup report
     const lines: string[] = ['Hi everyone,'];
 
-    // Yesterday section
-    lines.push('Yesterday');
+    // Yesterday section - use smart label (Last Friday on Monday, Yesterday otherwise)
+    const { getDateInfo } = await import('../../core/date-utils.js');
+    const { previousDayLabel } = getDateInfo();
+    lines.push(previousDayLabel);
     if (state.tasksWithWorklogs.length > 0) {
       // Use tasksWithWorklogs to show descriptions as sub-items
       state.tasksWithWorklogs.forEach(({ task, worklogs }) => {
@@ -1072,7 +1096,7 @@ export class TUIApp {
   {cyan-fg}Ctrl+?{/cyan-fg}   Toggle help
 
 {bold}Panel Navigation:{/bold}
-  {cyan-fg}1{/cyan-fg} Today  {cyan-fg}2{/cyan-fg} Testing  {cyan-fg}3{/cyan-fg} Todo  {cyan-fg}0{/cyan-fg} Details
+  {cyan-fg}1{/cyan-fg} Today  {cyan-fg}2{/cyan-fg} Todo  {cyan-fg}3{/cyan-fg} Testing  {cyan-fg}4{/cyan-fg} Timelog
 
 {bold}More Actions:{/bold}
   {cyan-fg}s{/cyan-fg}      Change status

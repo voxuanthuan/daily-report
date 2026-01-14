@@ -23,7 +23,8 @@ export abstract class BasePanel {
       today: '[1] Report',
       todo: '[2] Todo',
       testing: '[3] Processing',
-      details: 'Details'
+      details: 'Details',
+      timelog: '[0] ⏱️  Time Tracking'
     };
     this.label = iconLabels[panelType] || label;
 
@@ -138,7 +139,8 @@ export abstract class BasePanel {
       today: '(1) 📅 Today',
       todo: '(3) 📝 Todo',
       testing: '(2) 🧪 Testing',
-      details: '(0) Details'
+      details: '(0) Details',
+      timelog: '(4) ⏱️  Time Tracking'
     };
 
     let labelText: string;
@@ -169,7 +171,8 @@ export abstract class BasePanel {
       today: '[1] Report',
       todo: '[2] Todo',
       testing: '[3] Processing',
-      details: 'Details'
+      details: 'Details',
+      timelog: '[0] ⏱️  Time Tracking'
     };
 
     const count = items.length;

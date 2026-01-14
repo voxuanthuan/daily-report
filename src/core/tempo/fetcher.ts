@@ -166,6 +166,55 @@ class TempoFetcher {
     }
   }
 
+  /**
+   * Enrich worklogs with issue details from Jira API
+   * Tempo API v4 only returns issueId, not key/summary
+   */
+  async enrichWorklogsWithIssueDetails(worklogs: Worklog[], jiraAxiosInstance: any): Promise<Worklog[]> {
+    // Get unique issue IDs
+    const issueIds = [...new Set(worklogs.map(log => (log.issue as any).id).filter(Boolean))];
+    
+    // Fetch issue details in batches
+    const issueDetailsMap = new Map<string, { key: string; summary: string }>();
+    
+    for (const issueId of issueIds) {
+      try {
+        const response = await jiraAxiosInstance.get(`/rest/api/3/issue/${issueId}`, {
+          params: {
+            fields: 'key,summary'
+          }
+        });
+        
+        issueDetailsMap.set(issueId, {
+          key: response.data.key,
+          summary: response.data.fields.summary
+        });
+      } catch (error) {
+        console.warn(`Failed to fetch issue details for ID ${issueId}:`, error);
+        // Continue with other issues
+      }
+    }
+    
+    // Enrich worklogs with issue details
+    return worklogs.map(log => {
+      const issueId = (log.issue as any).id;
+      const issueDetails = issueDetailsMap.get(issueId);
+      
+      if (issueDetails) {
+        return {
+          ...log,
+          issue: {
+            ...log.issue,
+            key: issueDetails.key,
+            summary: issueDetails.summary
+          }
+        };
+      }
+      
+      return log;
+    });
+  }
+
   // Clear cache for testing or configuration changes
   static clearCache(): void {
     worklogCache.clear();

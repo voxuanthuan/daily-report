@@ -236,6 +236,7 @@ export class DetailsPanel {
 
   render(): void {
     const task = this.state.getCurrentTask();
+    const focusedPanel = this.state.getState().focusedPanel;
 
     if (!task) {
       if (this.lastRenderedTaskId !== null) {
@@ -247,6 +248,15 @@ export class DetailsPanel {
     }
 
     const currentTaskId = task.key || task.id;
+
+    // Check if we're viewing from timelog panel - show worklog entry details
+    if (focusedPanel === 'timelog') {
+      const selectedWorklog = this.state.getSelectedItem('timelog');
+      if (selectedWorklog) {
+        this.renderWorklogEntry(selectedWorklog);
+        return;
+      }
+    }
 
     if (currentTaskId === this.lastRenderedTaskId) {
       return;
@@ -274,6 +284,9 @@ export class DetailsPanel {
     const imageAction = isKitty ? 'show in terminal' : 'open in browser';
     const imageHint = imageCount > 0 ? `{gray-fg}(Press 'v' to ${imageAction} ${imageCount} image${imageCount > 1 ? 's' : ''}){/gray-fg}` : '';
 
+    // Get time logs for this task
+    const timeLogsSection = this.getRecentTimeLogsForTask(key);
+
     const content = `
 
  {gray-fg}${type}  •  ${status}{/gray-fg}
@@ -284,10 +297,80 @@ export class DetailsPanel {
  ${formattedDescription || '{gray-fg}No description{/gray-fg}'}
 
  ${imageHint}
+
+ {bold}{cyan-fg}Time Logs{/cyan-fg}{/bold}
+${timeLogsSection}
   `.trim();
 
     this.widget.setContent(content);
     this.widget.screen.render();
+  }
+
+  /**
+   * Render details for a specific date's worklogs
+   */
+  private renderWorklogEntry(dateGroup: any): void {
+    const moment = require('moment-timezone');
+    
+    const date = dateGroup.displayDate;
+    const worklogs = dateGroup.worklogs || [];
+    const totalHours = (dateGroup.totalSeconds / 3600).toFixed(1);
+
+    // Build table header
+    const lines: string[] = [];
+    lines.push('');
+    lines.push(`{bold}{cyan-fg}Worklogs for ${date}{/cyan-fg}{/bold}`);
+    lines.push('');
+    lines.push(`{bold}Total: {green-fg}${totalHours} hours{/green-fg} • {white-fg}${worklogs.length} entries{/white-fg}{/bold}`);
+    lines.push('');
+    lines.push('{gray-fg}─'.repeat(60) + '{/gray-fg}');
+    lines.push('');
+
+    // Build table rows
+    worklogs.forEach((log: any, index: number) => {
+      const hours = (log.timeSpentSeconds / 3600).toFixed(1);
+      
+      // Access task data directly from the structure we created in TimeLogPanel
+      const taskKey = log.task.key;
+      const taskSummary = log.task.summary;
+      const description = log.description || '';
+      const cleanedDescription = this.cleanWorklogDescription(description);
+
+      // Task header
+      lines.push(`{bold}{cyan-fg}${taskKey}{/cyan-fg}{/bold} • {green-fg}${hours}h{/green-fg}`);
+      lines.push(`{white-fg}${taskSummary}{/white-fg}`);
+      
+      // Description if available
+      if (cleanedDescription) {
+        lines.push(`{gray-fg}└─{/gray-fg} ${cleanedDescription}`);
+      }
+      
+      // Separator between entries (except last one)
+      if (index < worklogs.length - 1) {
+        lines.push('');
+      }
+    });
+
+    const content = lines.join('\n');
+
+    this.widget.setContent(content);
+    this.widget.screen.render();
+    
+    // Update last rendered to force refresh when switching back
+    this.lastRenderedTaskId = null;
+  }
+
+  /**
+   * Clean worklog description by removing auto-generated prefixes
+   */
+  private cleanWorklogDescription(description: string): string {
+    if (!description) {
+      return '';
+    }
+    
+    // Remove "Working on issue XXX-123" pattern
+    const cleaned = description.replace(/^Working on issue\s+[A-Z0-9]+-\d+\s*/i, '');
+    return cleaned.trim();
   }
 
   private parseDescription(rawDescription: any): string {
