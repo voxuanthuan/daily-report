@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/yourusername/jira-daily-report/internal/config"
 	"github.com/yourusername/jira-daily-report/internal/tui"
@@ -27,13 +28,11 @@ var tuiCmd = &cobra.Command{
 			log.Fatal("Failed to load configuration:", err)
 		}
 
-		// Create and run gocui TUI
-		gui, err := tui.NewGui(cfg)
-		if err != nil {
-			log.Fatal("Failed to create TUI:", err)
-		}
+		// Create and run Bubble Tea TUI
+		model := tui.NewModel(cfg)
+		p := tea.NewProgram(model, tea.WithAltScreen())
 
-		if err := gui.Run(); err != nil {
+		if _, err := p.Run(); err != nil {
 			log.Fatal("Error running TUI:", err)
 		}
 	},

@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/yourusername/jira-daily-report/internal/model"
@@ -97,36 +98,38 @@ func (c *TempoClient) EnrichWorklogsWithIssueDetails(worklogs []model.Worklog) (
 		}
 	}
 
-	// Fetch issue details concurrently
-	issueDetailsMap := make(map[int]*model.Issue)
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	errChan := make(chan error, len(issueIDs))
-
-	for issueID := range issueIDs {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-
-			// Convert int ID to string for API call
-			issue, err := c.jiraClient.FetchIssue(fmt.Sprintf("%d", id))
-			if err != nil {
-				errChan <- fmt.Errorf("failed to fetch issue %d: %w", id, err)
-				return
-			}
-
-			mu.Lock()
-			issueDetailsMap[id] = issue
-			mu.Unlock()
-		}(issueID)
+	if len(issueIDs) == 0 {
+		return worklogs, nil
 	}
 
-	wg.Wait()
-	close(errChan)
+	// Convert to list for batching
+	var ids []string
+	for id := range issueIDs {
+		ids = append(ids, fmt.Sprintf("%d", id))
+	}
 
-	// Check for errors
-	if len(errChan) > 0 {
-		return nil, <-errChan
+	// Fetch issues in batches
+	issueDetailsMap := make(map[int]model.Issue)
+	batchSize := 50
+
+	for i := 0; i < len(ids); i += batchSize {
+		end := i + batchSize
+		if end > len(ids) {
+			end = len(ids)
+		}
+
+		batchIDs := ids[i:end]
+		jql := fmt.Sprintf("id in (%s)", strings.Join(batchIDs, ","))
+
+		issues, err := c.jiraClient.FetchTasks(jql)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch batch issues: %w", err)
+		}
+
+		for _, issue := range issues {
+			idInt, _ := strconv.Atoi(issue.ID)
+			issueDetailsMap[idInt] = issue
+		}
 	}
 
 	// Enrich worklogs with issue details

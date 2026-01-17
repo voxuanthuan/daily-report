@@ -17,34 +17,38 @@ const (
 
 // State holds the application state
 type State struct {
-	User            *model.User
-	ReportTasks     []model.Issue // In Progress + Yesterday tasks
-	TodoTasks       []model.Issue // Open tasks
-	ProcessingTasks []model.Issue // Under Review + Ready for Testing
-	YesterdayTasks  []model.Issue // Yesterday's tasks
-	Worklogs        []model.Worklog
-	DateGroups      []model.DateGroup
-	ActivePanel     PanelType
-	SelectedIndices map[PanelType]int
-	SelectedTask    *model.Issue // Currently selected task for details
-	Loading         bool
-	StatusMessage   string
-	Error           error
+	User                 *model.User
+	ReportTasks          []model.Issue // In Progress + Yesterday tasks
+	TodoTasks            []model.Issue // Open tasks
+	ProcessingTasks      []model.Issue // Under Review + Ready for Testing
+	YesterdayTasks       []model.Issue // Yesterday's tasks
+	Worklogs             []model.Worklog
+	DateGroups           []model.DateGroup
+	ActivePanel          PanelType
+	SelectedIndices      map[PanelType]int
+	SelectedTask         *model.Issue // Currently selected task for details
+	TimeTrackingExpanded bool         // Whether time tracking panel is expanded
+	Loading              bool         // Main loading state (blocks UI)
+	WorklogsLoading      bool         // Background worklog loading (doesn't block UI)
+	StatusMessage        string
+	Error                error
 }
 
 // NewState creates a new application state
 func NewState() *State {
 	return &State{
-		ReportTasks:     []model.Issue{},
-		TodoTasks:       []model.Issue{},
-		ProcessingTasks: []model.Issue{},
-		YesterdayTasks:  []model.Issue{},
-		Worklogs:        []model.Worklog{},
-		DateGroups:      []model.DateGroup{},
-		ActivePanel:     PanelReport,
-		SelectedIndices: make(map[PanelType]int),
-		Loading:         false,
-		StatusMessage:   "Ready",
+		ReportTasks:          []model.Issue{},
+		TodoTasks:            []model.Issue{},
+		ProcessingTasks:      []model.Issue{},
+		YesterdayTasks:       []model.Issue{},
+		Worklogs:             []model.Worklog{},
+		DateGroups:           []model.DateGroup{},
+		ActivePanel:          PanelReport,
+		SelectedIndices:      make(map[PanelType]int),
+		TimeTrackingExpanded: false,
+		Loading:              true, // Start with loading true
+		WorklogsLoading:      false,
+		StatusMessage:        "Loading tasks...",
 	}
 }
 

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -125,14 +126,22 @@ func (c *JiraClient) FetchIssue(issueID string) (*model.Issue, error) {
 	return &issue, nil
 }
 
-// FetchTasks retrieves tasks with a JQL query
+// FetchTasks retrieves tasks with a JQL query using POST to avoid 410 Gone or URL length limits
 func (c *JiraClient) FetchTasks(jql string) ([]model.Issue, error) {
-	endpoint := fmt.Sprintf("%s/rest/api/3/search", c.baseURL)
-	params := url.Values{}
-	params.Add("jql", jql)
-	params.Add("maxResults", "100")
+	endpoint := fmt.Sprintf("%s/rest/api/3/search/jql", c.baseURL)
 
-	req, err := http.NewRequest("GET", endpoint+"?"+params.Encode(), nil)
+	payload := map[string]interface{}{
+		"jql":        jql,
+		"maxResults": 100,
+		"fields":     []string{"key", "summary", "status", "issuetype", "priority", "assignee", "description"},
+	}
+
+	bodyBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return nil, err
 	}

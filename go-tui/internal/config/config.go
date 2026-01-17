@@ -129,3 +129,8 @@ func (m *Manager) GetTheme() string {
 	}
 	return m.config.Theme
 }
+
+// GetConfig returns the underlying configuration
+func (m *Manager) GetConfig() *Config {
+	return m.config
+}

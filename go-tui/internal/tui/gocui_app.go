@@ -3,6 +3,8 @@ package tui
 import (
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/jroimartin/gocui"
 	"github.com/yourusername/jira-daily-report/internal/api"
@@ -20,10 +22,31 @@ type Gui struct {
 
 // NewGui creates a new gocui-based TUI
 func NewGui(cfg *config.Manager) (*Gui, error) {
+	// Set TERM to xterm if terminfo issues are detected
+	originalTerm := os.Getenv("TERM")
+	if originalTerm == "" || strings.Contains(originalTerm, "256color") {
+		os.Setenv("TERM", "xterm")
+		defer os.Setenv("TERM", originalTerm) // Restore original after init
+	}
+
+	// Try to create GUI with OutputNormal first
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
-		return nil, err
+		// If that fails, try with explicit TERM=xterm
+		os.Setenv("TERM", "xterm")
+		g, err = gocui.NewGui(gocui.OutputNormal)
+		if err != nil {
+			// If still failing, try screen
+			os.Setenv("TERM", "screen")
+			g, err = gocui.NewGui(gocui.OutputNormal)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize terminal UI: %w", err)
+			}
+		}
 	}
+
+	// Restore original TERM after successful init
+	os.Setenv("TERM", originalTerm)
 
 	jiraClient := api.NewJiraClient(
 		cfg.GetJiraServer(),

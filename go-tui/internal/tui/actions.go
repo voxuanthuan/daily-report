@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"runtime"
 
+	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/yourusername/jira-daily-report/internal/model"
 )
@@ -104,9 +105,10 @@ func (m Model) copyTaskToClipboard() tea.Cmd {
 	selectedTask = &tasks[idx]
 
 	return func() tea.Msg {
-		// Note: clipboard.Init() should be called in main.go at startup
-		// For now, we'll just return a message
-		// TODO: Implement actual clipboard copy when clipboard is initialized
+		// Import clipboard at the top: "github.com/atotto/clipboard"
+		if err := clipboard.WriteAll(selectedTask.Key); err != nil {
+			return errMsg{fmt.Errorf("failed to copy: %w", err)}
+		}
 		return statusMsg{fmt.Sprintf("Copied %s to clipboard", selectedTask.Key)}
 	}
 }

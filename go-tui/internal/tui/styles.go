@@ -18,12 +18,12 @@ var (
 	activeBorderStyle = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(colorPrimary).
-				Padding(1, 2)
+				Padding(0, 1) // Reduced padding for more content space
 
 	inactiveBorderStyle = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(colorBorder).
-				Padding(1, 2)
+				Padding(0, 1) // Reduced padding for more content space
 
 	titleStyle        = lipgloss.NewStyle().Bold(true).Foreground(colorPrimary)
 	selectedItemStyle = lipgloss.NewStyle().Foreground(colorSelected).Bold(true)
