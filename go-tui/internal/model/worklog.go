@@ -9,12 +9,18 @@ type WorklogRequest struct {
 	AuthorAccountID  string `json:"authorAccountId"`
 }
 
+// WorklogResponseIssue represents the issue in a worklog creation response
+type WorklogResponseIssue struct {
+	ID  int    `json:"id"` // Tempo API returns this as a number
+	Key string `json:"key"`
+}
+
 // WorklogResponse represents the API response when creating a worklog
 type WorklogResponse struct {
-	TempoWorklogID int    `json:"tempoWorklogId"`
-	JiraWorklogID  int    `json:"jiraWorklogId"`
-	Issue          Issue  `json:"issue"`
-	TimeSpent      string `json:"timeSpent"`
-	StartDate      string `json:"startDate"`
-	Description    string `json:"description,omitempty"`
+	TempoWorklogID int                  `json:"tempoWorklogId"`
+	JiraWorklogID  int                  `json:"jiraWorklogId"`
+	Issue          WorklogResponseIssue `json:"issue"`
+	TimeSpent      string               `json:"timeSpent"`
+	StartDate      string               `json:"startDate"`
+	Description    string               `json:"description,omitempty"`
 }

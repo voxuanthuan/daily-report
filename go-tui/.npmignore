@@ -1,0 +1,37 @@
+# Development files
+*.bak
+*.bak2
+*.bak3
+.env
+.env.local
+.env.example
+
+# Go files
+go.mod
+go.sum
+*.go
+cmd/
+internal/
+
+# Build scripts
+build.sh
+test-progressive-loading.sh
+build-all.sh
+jira-tui
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Keep only what's needed for npm
+!bin/
+!package.json
+!install.js
+!README.md
+!LICENSE

@@ -133,7 +133,7 @@ func (c *JiraClient) FetchTasks(jql string) ([]model.Issue, error) {
 	payload := map[string]interface{}{
 		"jql":        jql,
 		"maxResults": 100,
-		"fields":     []string{"key", "summary", "status", "issuetype", "priority", "assignee", "description"},
+		"fields":     []string{"key", "summary", "status", "issuetype", "priority", "assignee", "description", "fixVersions"},
 	}
 
 	bodyBytes, err := json.Marshal(payload)

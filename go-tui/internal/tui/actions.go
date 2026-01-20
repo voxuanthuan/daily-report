@@ -8,6 +8,7 @@ import (
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/yourusername/jira-daily-report/internal/model"
+	"github.com/yourusername/jira-daily-report/internal/tui/state"
 )
 
 // handleAction handles Enter key press to show action menu
@@ -18,15 +19,15 @@ func (m Model) handleAction() (tea.Model, tea.Cmd) {
 	var idx int
 
 	switch m.state.ActivePanel {
-	case PanelReport:
+	case state.PanelReport:
 		tasks = m.state.ReportTasks
-		idx = m.state.SelectedIndices[PanelReport]
-	case PanelTodo:
+		idx = m.state.SelectedIndices[state.PanelReport]
+	case state.PanelTodo:
 		tasks = m.state.TodoTasks
-		idx = m.state.SelectedIndices[PanelTodo]
-	case PanelProcessing:
+		idx = m.state.SelectedIndices[state.PanelTodo]
+	case state.PanelProcessing:
 		tasks = m.state.ProcessingTasks
-		idx = m.state.SelectedIndices[PanelProcessing]
+		idx = m.state.SelectedIndices[state.PanelProcessing]
 	default:
 		// No actions for Time Tracking or Details panels
 		return m, nil
@@ -81,15 +82,15 @@ func (m Model) copyTaskToClipboard() tea.Cmd {
 	var idx int
 
 	switch m.state.ActivePanel {
-	case PanelReport:
+	case state.PanelReport:
 		tasks = m.state.ReportTasks
-		idx = m.state.SelectedIndices[PanelReport]
-	case PanelTodo:
+		idx = m.state.SelectedIndices[state.PanelReport]
+	case state.PanelTodo:
 		tasks = m.state.TodoTasks
-		idx = m.state.SelectedIndices[PanelTodo]
-	case PanelProcessing:
+		idx = m.state.SelectedIndices[state.PanelTodo]
+	case state.PanelProcessing:
 		tasks = m.state.ProcessingTasks
-		idx = m.state.SelectedIndices[PanelProcessing]
+		idx = m.state.SelectedIndices[state.PanelProcessing]
 	default:
 		return func() tea.Msg {
 			return statusMsg{"No task selected"}

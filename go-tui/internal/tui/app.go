@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 	"time"
@@ -14,11 +13,18 @@ import (
 	"github.com/yourusername/jira-daily-report/internal/config"
 	"github.com/yourusername/jira-daily-report/internal/jira"
 	"github.com/yourusername/jira-daily-report/internal/model"
+	"github.com/yourusername/jira-daily-report/internal/tui/actions"
+	"github.com/yourusername/jira-daily-report/internal/tui/refresh"
+	"github.com/yourusername/jira-daily-report/internal/tui/state"
 )
 
 // Model represents the Bubbletea application model
 type Model struct {
-	state            *State
+	state            *state.State
+	actionExecutor   *actions.ActionExecutor
+	activePoller     *refresh.Poller // Currently active poller, nil if none
+	refreshConfig    refresh.Config  // Polling configuration
+	showingHistory   bool            // Whether the history overlay is visible
 	keys             KeyMap
 	width            int
 	height           int
@@ -56,12 +62,14 @@ func NewModel(cfg *config.Manager) *Model {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return &Model{
-		state:       NewState(),
-		keys:        DefaultKeyMap(),
-		jiraClient:  jiraClient,
-		tempoClient: tempoClient,
-		config:      cfg,
-		spinner:     s,
+		state:          state.NewState(),
+		actionExecutor: actions.NewActionExecutor(),
+		refreshConfig:  refresh.DefaultConfig(),
+		keys:           DefaultKeyMap(),
+		jiraClient:     jiraClient,
+		tempoClient:    tempoClient,
+		config:         cfg,
+		spinner:        s,
 	}
 }
 
@@ -104,8 +112,6 @@ type startPhase2Msg struct{}
 
 // loadTasksCmd fetches user and tasks (fast path - Phase 1)
 func (m *Model) loadTasksCmd() tea.Msg {
-	start := time.Now()
-	log.Printf("[%s] [PHASE 1] Starting task loading...\n", time.Now().Format("15:04:05.000"))
 	// Fetch current user
 	user, err := m.jiraClient.FetchCurrentUser()
 	if err != nil {
@@ -166,11 +172,6 @@ func (m *Model) loadTasksCmd() tea.Msg {
 	// Combine Under Review + Testing for Processing panel
 	processingTasks := append(underReview, testing...)
 
-	elapsed := time.Since(start)
-	log.Printf("[%s] [PHASE 1] Completed! Loaded %d tasks (took %v)\n",
-		time.Now().Format("15:04:05.000"),
-		len(inProgress)+len(todo)+len(processingTasks),
-		elapsed)
 	return tasksLoadedMsg{
 		user:            user,
 		reportTasks:     inProgress,
@@ -181,9 +182,6 @@ func (m *Model) loadTasksCmd() tea.Msg {
 
 // loadWorklogsCmd fetches worklogs and enriches them (background - Phase 2)
 func (m *Model) loadWorklogsCmd() tea.Msg {
-	start := time.Now()
-	log.Printf("[%s] [PHASE 2] Starting worklog loading...\n", time.Now().Format("15:04:05.000"))
-
 	if m.state.User == nil {
 		return worklogsLoadedMsg{err: fmt.Errorf("user not loaded")}
 	}
@@ -203,11 +201,6 @@ func (m *Model) loadWorklogsCmd() tea.Msg {
 	// Group by date
 	dateGroups := groupWorklogsByDate(enriched)
 
-	elapsed := time.Since(start)
-	log.Printf("[%s] [PHASE 2] Completed! Loaded %d worklogs (took %v)\n",
-		time.Now().Format("15:04:05.000"),
-		len(enriched),
-		elapsed)
 	return worklogsLoadedMsg{
 		worklogs:   enriched,
 		dateGroups: dateGroups,
@@ -251,41 +244,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusModal = NewStatusDialogModel(msg.transitions, msg.status, msg.issueKey)
 		return m, nil
 
+	case logTimeSubmittedMsg:
+		// Close modal
+		m.logTimeModal = nil
+
+		ctx := actions.NewActionContext(m.state, m.jiraClient, m.tempoClient, m.config)
+		// We use the task from the message to ensure context is correct
+		// Though usually it matches the selected task
+
+		action := actions.NewLogTimeAction(msg.timeValue, msg.description, msg.date)
+		return m, m.actionExecutor.ExecuteAction(action, ctx)
+
 	case statusChangeConfirmedMsg:
 		m.state.StatusMessage = fmt.Sprintf("Changing status to %s...", msg.targetStatus)
 
-		// Return async command to execute change
-		return m, func() tea.Msg {
-			// 1. Fetch available transitions to resolve ID
-			transitions, err := jira.GetAvailableTransitions(msg.issueKey, m.config.GetConfig())
-			if err != nil {
-				return statusMessage{message: fmt.Sprintf("Failed to fetch transitions: %v", err), isError: true}
-			}
+		// Close modal
+		m.statusModal = nil
 
-			// 2. Find matching transition
-			var targetID string
-			for _, t := range transitions {
-				if strings.EqualFold(t.To.Name, msg.targetStatus) {
-					targetID = t.ID
-					break
-				}
-			}
+		ctx := actions.NewActionContext(m.state, m.jiraClient, m.tempoClient, m.config)
 
-			if targetID == "" {
-				return statusMessage{message: fmt.Sprintf("Transition to '%s' not allowed by Jira", msg.targetStatus), isError: true}
-			}
-
-			// 3. Execute
-			err = jira.ChangeIssueStatus(msg.issueKey, targetID, m.config.GetConfig())
-			if err != nil {
-				return statusMessage{message: fmt.Sprintf("Failed to change status: %v", err), isError: true}
-			}
-			return statusMessage{
-				message: fmt.Sprintf("✓ Changed %s to \"%s\" - waiting for Jira to update...", msg.issueKey, msg.targetStatus),
-				isError: false,
-				refresh: true,
-			}
-		}
+		// Use ChangeStatusAction with ID directly
+		action := actions.NewChangeStatusAction(msg.targetStatus, msg.transitionID)
+		return m, m.actionExecutor.ExecuteAction(action, ctx)
 
 	case tasksLoadedMsg:
 		// Phase 1 complete: Tasks loaded, show them immediately
@@ -295,7 +275,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state.ProcessingTasks = msg.processingTasks
 		m.state.Loading = false
 		m.state.WorklogsLoading = true
-		log.Printf("[%s] [UPDATE] Tasks loaded, UI should update NOW. Starting Phase 2...\n", time.Now().Format("15:04:05.000"))
 		m.state.StatusMessage = fmt.Sprintf("Loaded %d tasks. Loading time data...",
 			len(msg.reportTasks)+len(msg.todoTasks)+len(msg.processingTasks))
 		// Chain Phase 2: Load worklogs in background (with small delay to let UI update)
@@ -322,7 +301,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case startPhase2Msg:
 		// Triggered after UI has had time to render Phase 1 results
-		log.Printf("[%s] [TRIGGER] Starting Phase 2 after UI update\n", time.Now().Format("15:04:05.000"))
 		return m, func() tea.Msg {
 			return m.loadWorklogsCmd()
 		}
@@ -376,6 +354,155 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 		}
 		return m, nil
+
+	// Action lifecycle messages
+	case actions.ActionStartedMsg:
+		// Action has been validated and is starting execution
+		m.state.CurrentAction = &state.ActionState{
+			Name:      msg.ActionName,
+			State:     state.ActionExecuting,
+			StartTime: msg.StartTime,
+			Message:   fmt.Sprintf("Executing %s...", msg.ActionName),
+		}
+
+		// Apply optimistic update if action supports it
+		newState := msg.Action.OptimisticUpdate(m.state)
+		m.state = newState
+
+		// Now execute the actual action
+		ctx := actions.NewActionContext(m.state, m.jiraClient, m.tempoClient, m.config)
+		return m, msg.Action.Execute(ctx)
+
+	case actions.ActionCompletedMsg:
+		// Action completed successfully
+		if m.state.CurrentAction != nil {
+			// Record the result in history
+			m.actionExecutor.RecordResult(state.ActionResult{
+				ActionName: msg.ActionName,
+				Success:    true,
+				StartTime:  m.state.CurrentAction.StartTime,
+				EndTime:    time.Now(),
+				Duration:   time.Since(m.state.CurrentAction.StartTime),
+			})
+		}
+
+		// Update status with result message
+		m.state.CurrentAction = nil // Clear current action
+		m.state.StatusMessage = fmt.Sprintf("✓ %s completed", msg.ActionName)
+
+		// Record in history
+		m.state.ActionHistory = append(m.state.ActionHistory, state.ActionResult{
+			ActionName: msg.ActionName,
+			Success:    true,
+			StartTime:  time.Now().Add(-msg.Duration), // Approximate start time
+			EndTime:    time.Now(),
+			Duration:   msg.Duration,
+		})
+		// Keep last 50 actions
+		if len(m.state.ActionHistory) > 50 {
+			m.state.ActionHistory = m.state.ActionHistory[len(m.state.ActionHistory)-50:]
+		}
+
+		// Check if action needs verification
+		strategy := msg.Action.GetRefreshStrategy()
+		if strategy == state.RefreshPolling {
+			// Start polling
+			poller := refresh.NewPoller(msg.Action, m.refreshConfig)
+			m.activePoller = poller
+
+			// Update status message
+			m.state.StatusMessage = fmt.Sprintf("%s completed, verifying...", msg.ActionName)
+
+			return m, poller.NextPoll()
+		}
+		return m, nil
+
+	case refresh.RefreshPollingMsg:
+		// Verify if action changes are reflected
+		verifier := refresh.GetVerifier(msg.Poller.GetAction())
+		clients := refresh.VerifierClients{
+			JiraClient:  m.jiraClient,
+			TempoClient: m.tempoClient,
+		}
+
+		verified, err := verifier.Verify(msg.Poller.GetAction(), m.state, clients)
+
+		if err != nil {
+			// Verification error - retry or timeout
+			if msg.Poller.ShouldContinue() {
+				return m, msg.Poller.NextPoll()
+			}
+			return m, func() tea.Msg {
+				return refresh.RefreshTimeoutMsg{
+					ActionName: msg.ActionName,
+					Attempts:   msg.Attempt,
+				}
+			}
+		}
+
+		if verified {
+			// Success! Changes are reflected
+			m.activePoller = nil
+			return m, func() tea.Msg {
+				return refresh.RefreshVerifiedMsg{
+					ActionName: msg.ActionName,
+					Success:    true,
+				}
+			}
+		}
+
+		// Not yet reflected, schedule next poll
+		if msg.Poller.ShouldContinue() {
+			return m, msg.Poller.NextPoll()
+		}
+
+		// Max attempts reached
+		m.activePoller = nil
+		return m, func() tea.Msg {
+			return refresh.RefreshTimeoutMsg{
+				ActionName: msg.ActionName,
+				Attempts:   msg.Attempt,
+			}
+		}
+
+	case refresh.RefreshVerifiedMsg:
+		m.state.CurrentAction = nil
+		m.state.StatusMessage = fmt.Sprintf("✓ %s verified", msg.ActionName)
+		// Trigger full refresh to update UI state with confirmed data
+		m.state.Loading = true
+		return m, m.loadTasksCmd
+
+	case refresh.RefreshTimeoutMsg:
+		m.state.CurrentAction = nil
+		m.state.StatusMessage = fmt.Sprintf("⚠ %s verification timed out. Press 'r' to refresh.", msg.ActionName)
+		return m, nil
+
+	case actions.ActionFailedMsg:
+		m.state.CurrentAction = nil // Clear current action
+		m.state.StatusMessage = fmt.Sprintf("✗ %s failed: %v", msg.ActionName, msg.Error)
+
+		// Record in history
+		m.state.ActionHistory = append(m.state.ActionHistory, state.ActionResult{
+			ActionName: msg.ActionName,
+			Success:    false,
+			Error:      msg.Error,
+			StartTime:  time.Now(),
+			EndTime:    time.Now(),
+		})
+		// Keep last 50 actions
+		if len(m.state.ActionHistory) > 50 {
+			m.state.ActionHistory = m.state.ActionHistory[len(m.state.ActionHistory)-50:]
+		}
+
+		// Rollback optimistic updates if snapshot exists
+		if m.state.StateSnapshot != nil {
+			actions.RestoreFromSnapshot(m.state, m.state.StateSnapshot)
+			m.state.StateSnapshot = nil
+		}
+		// Show error message
+		m.state.StatusMessage = fmt.Sprintf("Error: %v", msg.Error)
+		m.state.CurrentAction = nil
+		return m, nil
 	}
 
 	return m, nil
@@ -388,31 +515,47 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case "k", "up":
-		m.state.MoveSelectionUp()
+		// Scroll up in Details panel if active, otherwise move selection
+		if m.state.ActivePanel == state.PanelDetails {
+			m.state.ScrollDetailsUp()
+		} else {
+			m.state.MoveSelectionUp()
+		}
 		return m, nil
 
 	case "j", "down":
-		m.state.MoveSelectionDown()
+		// Scroll down in Details panel if active, otherwise move selection
+		if m.state.ActivePanel == state.PanelDetails {
+			m.state.ScrollDetailsDown(m.state.DetailsScrollMax)
+		} else {
+			m.state.MoveSelectionDown()
+		}
 		return m, nil
 
 	case "1":
-		m.state.ActivePanel = PanelReport
+		m.state.ActivePanel = state.PanelReport
 		m.state.TimeTrackingExpanded = false
 		return m, nil
 
 	case "2":
-		m.state.ActivePanel = PanelTodo
+		m.state.ActivePanel = state.PanelTodo
 		m.state.TimeTrackingExpanded = false
 		return m, nil
 
 	case "3":
-		m.state.ActivePanel = PanelProcessing
+		m.state.ActivePanel = state.PanelProcessing
 		m.state.TimeTrackingExpanded = false
 		return m, nil
 
-	case "0":
-		m.state.ActivePanel = PanelTimelog
+	case "4":
+		m.state.ActivePanel = state.PanelTimelog
 		m.state.TimeTrackingExpanded = true // Expand when navigating to time
+		return m, nil
+
+	case "0":
+		m.state.ActivePanel = state.PanelDetails
+		// Reset scroll when navigating to details
+		m.state.ResetDetailsScroll()
 		return m, nil
 
 	case "s":
@@ -423,15 +566,15 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Cycle through panels: Report -> Todo -> Processing -> Timelog -> Report
 		// Skip Details panel (not directly navigable)
 		switch m.state.ActivePanel {
-		case PanelReport:
-			m.state.ActivePanel = PanelTodo
-		case PanelTodo:
-			m.state.ActivePanel = PanelProcessing
-		case PanelProcessing:
-			m.state.ActivePanel = PanelTimelog
+		case state.PanelReport:
+			m.state.ActivePanel = state.PanelTodo
+		case state.PanelTodo:
+			m.state.ActivePanel = state.PanelProcessing
+		case state.PanelProcessing:
+			m.state.ActivePanel = state.PanelTimelog
 			m.state.TimeTrackingExpanded = true
-		case PanelTimelog, PanelDetails:
-			m.state.ActivePanel = PanelReport
+		case state.PanelTimelog, state.PanelDetails:
+			m.state.ActivePanel = state.PanelReport
 			m.state.TimeTrackingExpanded = false
 		}
 		return m, nil
@@ -439,46 +582,26 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "h", "left":
 		// Cycle backwards through panels
 		switch m.state.ActivePanel {
-		case PanelReport:
-			m.state.ActivePanel = PanelTimelog
+		case state.PanelReport:
+			m.state.ActivePanel = state.PanelTimelog
 			m.state.TimeTrackingExpanded = true
-		case PanelTodo:
-			m.state.ActivePanel = PanelReport
+		case state.PanelTodo:
+			m.state.ActivePanel = state.PanelReport
 			m.state.TimeTrackingExpanded = false
-		case PanelProcessing:
-			m.state.ActivePanel = PanelTodo
+		case state.PanelProcessing:
+			m.state.ActivePanel = state.PanelTodo
 			m.state.TimeTrackingExpanded = false
-		case PanelTimelog, PanelDetails:
-			m.state.ActivePanel = PanelProcessing
+		case state.PanelTimelog, state.PanelDetails:
+			m.state.ActivePanel = state.PanelProcessing
 			m.state.TimeTrackingExpanded = false
 		}
 		return m, nil
 
 	case "o":
-		// Open Jira ticket in browser
-		var selectedTask *model.Issue
-		var tasks []model.Issue
-		var idx int
-
-		switch m.state.ActivePanel {
-		case PanelReport:
-			tasks = m.state.ReportTasks
-			idx = m.state.SelectedIndices[PanelReport]
-		case PanelTodo:
-			tasks = m.state.TodoTasks
-			idx = m.state.SelectedIndices[PanelTodo]
-		case PanelProcessing:
-			tasks = m.state.ProcessingTasks
-			idx = m.state.SelectedIndices[PanelProcessing]
-		default:
-			return m, nil
-		}
-
-		if len(tasks) > 0 && idx < len(tasks) {
-			selectedTask = &tasks[idx]
-			return m, m.openTaskURL(selectedTask)
-		}
-		return m, nil
+		// Open Jira ticket in browser using new action framework
+		ctx := actions.NewActionContext(m.state, m.jiraClient, m.tempoClient, m.config)
+		action := actions.NewOpenURLAction()
+		return m, m.actionExecutor.ExecuteAction(action, ctx)
 
 	case "r":
 		// Refresh data (progressive loading)
@@ -487,9 +610,16 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.state.StatusMessage = "Refreshing..."
 		return m, m.loadTasksCmd
 
+	case "H":
+		// Toggle history overlay
+		m.showingHistory = !m.showingHistory
+		return m, nil
+
 	case "c":
-		// Copy task key to clipboard
-		return m, m.copyTaskToClipboard()
+		// Copy task key to clipboard using new action framework
+		ctx := actions.NewActionContext(m.state, m.jiraClient, m.tempoClient, m.config)
+		action := actions.NewCopyKeyAction()
+		return m, m.actionExecutor.ExecuteAction(action, ctx)
 
 	case "i":
 		// Show log time modal
@@ -523,15 +653,15 @@ func (m Model) handleChangeStatus() (Model, tea.Cmd) {
 	var idx int
 
 	switch m.state.ActivePanel {
-	case PanelReport:
+	case state.PanelReport:
 		tasks = m.state.ReportTasks
-		idx = m.state.SelectedIndices[PanelReport]
-	case PanelTodo:
+		idx = m.state.SelectedIndices[state.PanelReport]
+	case state.PanelTodo:
 		tasks = m.state.TodoTasks
-		idx = m.state.SelectedIndices[PanelTodo]
-	case PanelProcessing:
+		idx = m.state.SelectedIndices[state.PanelTodo]
+	case state.PanelProcessing:
 		tasks = m.state.ProcessingTasks
-		idx = m.state.SelectedIndices[PanelProcessing]
+		idx = m.state.SelectedIndices[state.PanelProcessing]
 	default:
 		return m, func() tea.Msg { return statusMessage{message: "No task selected", isError: true} }
 	}
@@ -640,9 +770,9 @@ func (m Model) View() string {
 	detailsPanelHeight := leftContentSpace - timePanelHeight
 
 	// Render panels with calculated dimensions
-	reportPanel := m.renderPanelWithSize("Report", PanelReport, m.state.ReportTasks, "[1]", leftPanelWidth, h1)
-	todoPanel := m.renderPanelWithSize("Todo", PanelTodo, m.state.TodoTasks, "[2]", leftPanelWidth, h2)
-	processingPanel := m.renderPanelWithSize("Processing", PanelProcessing, m.state.ProcessingTasks, "[3]", leftPanelWidth, h3)
+	reportPanel := m.renderPanelWithSize("Report", state.PanelReport, m.state.ReportTasks, "[1]", leftPanelWidth, h1)
+	todoPanel := m.renderPanelWithSize("Todo", state.PanelTodo, m.state.TodoTasks, "[2]", leftPanelWidth, h2)
+	processingPanel := m.renderPanelWithSize("Processing", state.PanelProcessing, m.state.ProcessingTasks, "[3]", leftPanelWidth, h3)
 	detailsPanel := m.renderDetailsPanelWithSize(rightPanelWidth, detailsPanelHeight)
 	timelogPanel := m.renderTimelogPanelWithSize(rightPanelWidth, timePanelHeight)
 
@@ -773,11 +903,21 @@ func (m Model) View() string {
 		return strings.Join(overlayLines, "\n")
 	}
 
+	// Overlay history if active (lowest priority overlay)
+	if m.showingHistory {
+		historyView := m.renderHistoryOverlay()
+		// Simple overwrite for now as renderHistoryOverlay uses Place which creates full screen string
+		// But Place might return string with spaces for transparency?
+		// Actually Place typically returns a block of size width x height.
+		return historyView
+	}
+
 	return baseView
+
 }
 
 // renderPanelWithSize renders a task panel with dynamic dimensions
-func (m Model) renderPanelWithSize(title string, panelType PanelType, tasks []model.Issue, panelLabel string, width int, height int) string {
+func (m Model) renderPanelWithSize(title string, panelType state.PanelType, tasks []model.Issue, panelLabel string, width int, height int) string {
 	isActive := m.state.ActivePanel == panelType
 	selectedIdx := m.state.SelectedIndices[panelType]
 
@@ -788,7 +928,7 @@ func (m Model) renderPanelWithSize(title string, panelType PanelType, tasks []mo
 		items = append(items, itemStyle.Foreground(colorMuted).Render("No tasks"))
 	} else {
 		// Calculate how many items can fit (more space now without title)
-		maxItems := height - 1 // Reserve minimal space for border
+		maxItems := height - 2 // Only top and bottom borders (title moved to border)
 		displayTasks := tasks
 		if len(tasks) > maxItems {
 			// Show items around selection
@@ -838,25 +978,32 @@ func (m Model) renderPanelWithSize(title string, panelType PanelType, tasks []mo
 		}
 	}
 
-	// Prepend compact title line
-	panelTitle := titleStyle.Render(fmt.Sprintf("%s %s (%d)", panelLabel, title, len(tasks)))
-	allContent := panelTitle + "\n" + strings.Join(items, "\n")
+	// No title in content - will be in border
+	content := strings.Join(items, "\n")
 
-	if isActive {
-		return activeBorderStyle.Width(width - 2).Height(height - 2).Render(allContent)
+	// Title for top border
+	borderTitle := fmt.Sprintf("%s %s", panelLabel, title)
+
+	// Counter for bottom-right showing selection position
+	counter := ""
+	if len(tasks) > 0 {
+		counter = fmt.Sprintf("%d of %d", selectedIdx+1, len(tasks))
+	} else {
+		counter = "0 items"
 	}
-	return inactiveBorderStyle.Width(width - 2).Height(height - 2).Render(allContent)
+
+	return RenderWithTitleAndCounter(content, width, height, borderTitle, counter, isActive, RoundedBorder)
 }
 
 // renderTimelogPanelWithSize renders the time tracking panel with dynamic dimensions
 func (m Model) renderTimelogPanelWithSize(width, height int) string {
-	isActive := m.state.ActivePanel == PanelTimelog
-	selectedIdx := m.state.SelectedIndices[PanelTimelog]
+	isActive := m.state.ActivePanel == state.PanelTimelog
+	selectedIdx := m.state.SelectedIndices[state.PanelTimelog]
 
 	var items []string
 
 	// Always render in expanded mode
-	panelTitle := titleStyle.Render(fmt.Sprintf("[0] Time Tracking (%d)", len(m.state.DateGroups)))
+	// Title will be in border, not in content
 
 	// Show loading indicator when worklogs are being fetched
 	if m.state.WorklogsLoading {
@@ -908,139 +1055,236 @@ func (m Model) renderTimelogPanelWithSize(width, height int) string {
 		}
 	}
 
-	allContent := panelTitle + "\n" + strings.Join(items, "\n")
+	// No title in content - will be in border
+	content := strings.Join(items, "\n")
 
-	if isActive {
-		return activeBorderStyle.Width(width - 2).Height(height - 2).Render(allContent)
+	// Title for top border
+	borderTitle := "[4] Time Tracking"
+
+	// Counter for bottom-right
+	counter := ""
+	if len(m.state.DateGroups) > 0 {
+		counter = fmt.Sprintf("%d of %d", selectedIdx+1, len(m.state.DateGroups))
+	} else {
+		counter = "0 groups"
 	}
-	return inactiveBorderStyle.Width(width - 2).Height(height - 2).Render(allContent)
+
+	return RenderWithTitleAndCounter(content, width, height, borderTitle, counter, isActive, RoundedBorder)
 }
 
 // renderDetailsPanelWithSize renders the details panel with dynamic dimensions
 func (m Model) renderDetailsPanelWithSize(width, height int) string {
-	isActive := m.state.ActivePanel == PanelDetails
-
-	var items []string
-	// Title is now part of the content block or handled by the border with proper view structure
-	// But here we append it to items?
-	// Previous code: panelTitle := titleStyle.Render("Details") -> allContent := panelTitle + "\n" + ...
-
-	// We'll keep that pattern
-	panelTitle := titleStyle.Render("Details")
+	isActive := m.state.ActivePanel == state.PanelDetails
 
 	// Calculate content width available inside the panel
-	// Panel has Border (1+1=2) and Padding(0, 1) (1+1=2). Total overhead = 4.
 	contentWidth := width - 4
 	if contentWidth < 1 {
 		contentWidth = 1
 	}
 
-	// If Time panel is active or selected, show worklog details
-	if m.state.ActivePanel == PanelTimelog && len(m.state.DateGroups) > 0 {
-		selectedIdx := m.state.SelectedIndices[PanelTimelog]
+	var items []string
+
+	// Check which panel is active to determine what to show
+	if m.state.ActivePanel == state.PanelTimelog {
+		// SHOW TIMELOG DETAILS for selected date
+		selectedIdx := m.state.SelectedIndices[state.PanelTimelog]
 		if selectedIdx >= 0 && selectedIdx < len(m.state.DateGroups) {
 			dateGroup := m.state.DateGroups[selectedIdx]
-			hours := float64(dateGroup.TotalSeconds) / 3600.0
+			totalHours := float64(dateGroup.TotalSeconds) / 3600.0
 
-			// Date header
-			items = append(items, selectedItemStyle.Render(fmt.Sprintf("%s (%.1fh)", dateGroup.DisplayDate, hours)))
+			// Header: Date + Total Time
+			header := fmt.Sprintf("📅 %s - %.1fh Total", dateGroup.DisplayDate, totalHours)
+			items = append(items, selectedItemStyle.Render(header))
+			items = append(items, strings.Repeat("─", contentWidth))
 			items = append(items, "")
 
-			// Show each worklog
+			// List all worklogs for this date
 			for _, worklog := range dateGroup.Worklogs {
 				worklogHours := float64(worklog.TimeSpentSeconds) / 3600.0
-
-				// Issue key + time
 				issueKey := worklog.Issue.Key
+				issueSummary := worklog.Issue.Summary
 				if issueKey == "" {
 					issueKey = "Unknown"
 				}
-				items = append(items, itemStyle.Render(fmt.Sprintf("• %s (%.1fh)", issueKey, worklogHours)))
 
-				// Description (if exists)
-				if worklog.Description != "" {
-					// Use lipgloss to wrap description
-					// Indent by 2 spaces (PaddingLeft)
-					wrappedDesc := itemStyle.Foreground(colorMuted).Width(contentWidth).PaddingLeft(2).Render(worklog.Description)
-					items = append(items, wrappedDesc)
+				// 1. Ticket ID + Title
+				// Worklog response doesn't include issue type, so use generic icon
+				icon := "🎫"
+				titleLine := fmt.Sprintf("%s %s %s", icon, issueKey, issueSummary)
+				// Truncate title if too long
+				if len(titleLine) > contentWidth {
+					titleLine = titleLine[:contentWidth-3] + "..."
 				}
-				items = append(items, "") // Spacing between worklogs
-			}
+				items = append(items, selectedItemStyle.Render(titleLine))
 
-			// Render content
-			content := strings.Join(items, "\n")
-			// Prepend title
-			allContent := panelTitle + "\n" + content
+				// 2. Time Logged
+				timeLine := fmt.Sprintf("⏱  %.2fh", worklogHours)
+				items = append(items, itemStyle.Foreground(colorSuccess).Render(timeLine))
 
-			if isActive {
-				return activeBorderStyle.Width(width - 2).Height(height - 2).Render(allContent)
+				// 3. Description
+				if worklog.Description != "" {
+					items = append(items, itemStyle.Foreground(colorMuted).Render("📝 Description:"))
+					descLines := parseDescription(worklog.Description, contentWidth)
+					items = append(items, descLines...)
+				} else {
+					items = append(items, itemStyle.Foreground(colorMuted).Render("📝 No description"))
+				}
+
+				// Separator
+				items = append(items, "")
+				items = append(items, itemStyle.Foreground(colorBorder).Render(strings.Repeat("─", contentWidth/2)))
+				items = append(items, "")
 			}
-			return inactiveBorderStyle.Width(width - 2).Height(height - 2).Render(allContent)
+		} else {
+			items = append(items, itemStyle.Foreground(colorMuted).Render("No date selected"))
 		}
-	}
-
-	// Get selected task from active panel (original behavior for task panels)
-	var selectedTask *model.Issue
-	var tasks []model.Issue
-	var idx int
-
-	switch m.state.ActivePanel {
-	case PanelReport:
-		tasks = m.state.ReportTasks
-		idx = m.state.SelectedIndices[PanelReport]
-	case PanelTodo:
-		tasks = m.state.TodoTasks
-		idx = m.state.SelectedIndices[PanelTodo]
-	case PanelProcessing:
-		tasks = m.state.ProcessingTasks
-		idx = m.state.SelectedIndices[PanelProcessing]
-	}
-
-	if len(tasks) > 0 && idx < len(tasks) {
-		selectedTask = &tasks[idx]
-	}
-
-	if selectedTask == nil {
-		items = append(items, itemStyle.Foreground(colorMuted).Render("No task selected"))
 	} else {
-		// Show task details
-		icon := GetIssueIcon(selectedTask.Fields.IssueType.Name)
-		items = append(items, selectedItemStyle.Render(fmt.Sprintf("%s %s", icon, selectedTask.Key)))
-		items = append(items, "")
-		items = append(items, itemStyle.Render("⏺ "+selectedTask.Fields.Status.Name))
-		items = append(items, "")
+		// SHOW TASK DETAILS (Default behavior)
+		// Get selected task from the last active task panel
+		var selectedTask *model.Issue
+		var tasks []model.Issue
+		var idx int
 
-		// Wrap summary using lipgloss
-		summary := selectedTask.Fields.Summary
-		wrappedSummary := itemStyle.Width(contentWidth).Render(summary)
-		items = append(items, wrappedSummary)
+		// Check which panel was last active (or current if it's a task panel)
+		activePanel := m.state.ActivePanel
+		if activePanel == state.PanelDetails {
+			// Use last task panel
+			activePanel = m.state.LastTaskPanel
+		} else {
+			// Update last task panel
+			m.state.LastTaskPanel = activePanel
+		}
 
-		// Add action hints at bottom if panel is active
-		// Note: Checking height validness to avoid cluttering if too small
-		if isActive && height > 10 {
+		switch activePanel {
+		case state.PanelReport:
+			tasks = m.state.ReportTasks
+			idx = m.state.SelectedIndices[state.PanelReport]
+		case state.PanelTodo:
+			tasks = m.state.TodoTasks
+			idx = m.state.SelectedIndices[state.PanelTodo]
+		case state.PanelProcessing:
+			tasks = m.state.ProcessingTasks
+			idx = m.state.SelectedIndices[state.PanelProcessing]
+		}
+
+		if len(tasks) > 0 && idx < len(tasks) {
+			selectedTask = &tasks[idx]
+		}
+
+		if selectedTask == nil {
+			items = append(items, itemStyle.Foreground(colorMuted).Render("No task selected"))
+		} else {
+			// 1. Icon + Task Key
+			icon := GetIssueIcon(selectedTask.Fields.IssueType.Name)
+			items = append(items, selectedItemStyle.Render(fmt.Sprintf("%s %s", icon, selectedTask.Key)))
 			items = append(items, "")
-			items = append(items, itemStyle.Foreground(colorMuted).Render("Actions:"))
-			items = append(items, itemStyle.Foreground(colorMuted).Render("Enter - Open in browser"))
-			items = append(items, itemStyle.Foreground(colorMuted).Render("t - Log time"))
-			items = append(items, itemStyle.Foreground(colorMuted).Render("s - Change status"))
+
+			// 2. Status (de-emphasized)
+			items = append(items, itemStyle.Foreground(colorMuted).Render("⏺ "+selectedTask.Fields.Status.Name))
+
+			// 3. Fix Versions (prominently displayed if present)
+			if len(selectedTask.Fields.FixVersions) > 0 {
+				versionNames := make([]string, len(selectedTask.Fields.FixVersions))
+				for i, v := range selectedTask.Fields.FixVersions {
+					versionNames[i] = v.Name
+				}
+				fixVersionText := "🏷️  Fix Version: " + strings.Join(versionNames, ", ")
+				items = append(items, selectedItemStyle.Render(fixVersionText))
+			}
+			items = append(items, "")
+
+			// 4. Task Title/Summary
+			items = append(items, itemStyle.Render("Title:"))
+			wrappedSummary := itemStyle.Width(contentWidth).Render(selectedTask.Fields.Summary)
+			items = append(items, wrappedSummary)
+			items = append(items, "")
+
+			// 5. Description with ADF parsing
+			items = append(items, itemStyle.Foreground(colorMuted).Render("Description:"))
+			descriptionLines := parseDescription(selectedTask.Fields.Description, contentWidth)
+			items = append(items, descriptionLines...)
 		}
 	}
 
-	allContent := panelTitle + "\n" + strings.Join(items, "\n")
+	// Store content lines for scrolling
+	m.state.DetailsContentLines = items
 
-	if isActive {
-		return activeBorderStyle.Width(width - 2).Height(height - 2).Render(allContent)
+	// Calculate scrolling
+	visibleHeight := height - 4 // Account for borders and title
+	if visibleHeight < 1 {
+		visibleHeight = 1
 	}
-	return inactiveBorderStyle.Width(width - 2).Height(height - 2).Render(allContent)
+
+	maxScroll := len(items) - visibleHeight
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	m.state.DetailsScrollMax = maxScroll
+
+	// Apply scroll offset
+	visibleStart := m.state.DetailsScrollOffset
+	if visibleStart > maxScroll {
+		visibleStart = maxScroll
+		m.state.DetailsScrollOffset = maxScroll
+	}
+
+	visibleEnd := visibleStart + visibleHeight
+	if visibleEnd > len(items) {
+		visibleEnd = len(items)
+	}
+
+	var visibleLines []string
+	if visibleStart < len(items) {
+		visibleLines = items[visibleStart:visibleEnd]
+	}
+
+	// Add scroll indicators
+	scrollInfo := ""
+	if maxScroll > 0 {
+		if m.state.DetailsScrollOffset > 0 && m.state.DetailsScrollOffset < maxScroll {
+			scrollInfo = " ▲▼"
+		} else if m.state.DetailsScrollOffset > 0 {
+			scrollInfo = " ▲"
+		} else if m.state.DetailsScrollOffset < maxScroll {
+			scrollInfo = " ▼"
+		}
+	}
+
+	// Title for top border with scroll indicators
+	borderTitle := "Details [0]" + scrollInfo
+
+	// No counter for details panel
+	counter := ""
+
+	// Use custom border rendering
+	content := strings.Join(visibleLines, "\n")
+	return RenderWithTitleAndCounter(content, width, height, borderTitle, counter, isActive, RoundedBorder)
 }
 
 // renderStatusBar renders the status bar
+// renderStatusBar renders the status bar
 func (m Model) renderStatusBar() string {
-	status := m.state.StatusMessage
-	if m.state.Loading {
-		status += " " + m.spinner.View()
+	helpText := "q: quit | j/k: move | 1/2/3/0: panels | o: open | yy: copy | r: refresh | i: log time | H: history"
+
+	// Add loading spinner if active (without text)
+	if m.state.Loading || m.activePoller != nil {
+		helpText = m.spinner.View() + " " + helpText
 	}
-	return statusBarStyle.Render(status + " | q: quit | j/k: move | 1/2/3/0: panels | o: open | yy: copy | r: refresh | i: log time")
+
+	maxWidth := m.width - 2 // Padding
+
+	if maxWidth <= 0 {
+		return ""
+	}
+
+	if len(helpText) > maxWidth {
+		if maxWidth > 3 {
+			return statusBarStyle.Render(helpText[:maxWidth-3] + "...")
+		}
+		return statusBarStyle.Render(helpText[:maxWidth])
+	}
+
+	return statusBarStyle.Render(helpText)
 }
 
 // Helper types for messages
@@ -1056,6 +1300,62 @@ type dataLoadedMsg struct {
 
 type errMsg struct {
 	error
+}
+
+// renderHistoryOverlay renders the action history overlay
+func (m Model) renderHistoryOverlay() string {
+	if len(m.state.ActionHistory) == 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
+			lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2).Render("No action history"),
+		)
+	}
+
+	var historyItems []string
+	// Show in reverse order (newest first)
+	startIndex := len(m.state.ActionHistory) - 1
+	endIndex := startIndex - (m.height - 4) // Reserve space for borders/title
+	if endIndex < 0 {
+		endIndex = -1
+	}
+
+	for i := startIndex; i > endIndex; i-- {
+		action := m.state.ActionHistory[i]
+
+		var icon, statusColor string
+		if action.Success {
+			icon = "✓"
+			statusColor = "86" // Green (aquamarine-like)
+		} else {
+			icon = "✗"
+			statusColor = "196" // Red
+		}
+
+		timeStr := action.EndTime.Format("15:04:05")
+
+		item := fmt.Sprintf("%s %s %s",
+			lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor)).Render(icon),
+			lipgloss.NewStyle().Width(10).Render(timeStr),
+			action.ActionName,
+		)
+
+		if action.Error != nil {
+			item += lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render(fmt.Sprintf(" (%v)", action.Error))
+		}
+
+		historyItems = append(historyItems, item)
+	}
+
+	historyList := strings.Join(historyItems, "\n")
+
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(1, 2).
+		Width(m.width - 4).
+		Render(lipgloss.NewStyle().Bold(true).Render("Action History") + "\n\n" + historyList)
+
+	// Center the box
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
 
 // groupWorklogsByDate groups worklogs by date

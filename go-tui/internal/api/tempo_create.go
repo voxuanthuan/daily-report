@@ -11,14 +11,20 @@ import (
 
 // CreateWorklog creates a new worklog entry in Tempo
 func (c *TempoClient) CreateWorklog(issueID int, timeSpentSeconds int, startDate string, description string, authorAccountID string) (*model.WorklogResponse, error) {
-	url := c.jiraClient.baseURL + "/rest/tempo-timesheets/4/worklogs"
+	// Use the correct Tempo API v4 endpoint
+	url := fmt.Sprintf("%s/worklogs", tempoBaseURL)
 
-	request := model.WorklogRequest{
-		IssueID:          issueID,
-		TimeSpentSeconds: timeSpentSeconds,
-		StartDate:        startDate,
-		Description:      description,
-		AuthorAccountID:  authorAccountID,
+	// Tempo API v4 requires issueId as string, not int
+	request := map[string]interface{}{
+		"issueId":          fmt.Sprintf("%d", issueID),
+		"timeSpentSeconds": timeSpentSeconds,
+		"startDate":        startDate,
+		"authorAccountId":  authorAccountID,
+	}
+
+	// Only add description if provided
+	if description != "" {
+		request["description"] = description
 	}
 
 	jsonData, err := json.Marshal(request)

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/yourusername/jira-daily-report/internal/tui/state"
 	"fmt"
 	"strings"
 
@@ -9,7 +10,7 @@ import (
 
 // renderDetailsPanel renders the details panel showing selected task info
 func (m Model) renderDetailsPanel() string {
-	isActive := m.state.ActivePanel == PanelDetails
+	isActive := m.state.ActivePanel == state.PanelDetails
 
 	var items []string
 	items = append(items, titleStyle.Render("Details"))
@@ -21,15 +22,15 @@ func (m Model) renderDetailsPanel() string {
 	var idx int
 
 	switch m.state.ActivePanel {
-	case PanelReport:
+	case state.PanelReport:
 		tasks = m.state.ReportTasks
-		idx = m.state.SelectedIndices[PanelReport]
-	case PanelTodo:
+		idx = m.state.SelectedIndices[state.PanelReport]
+	case state.PanelTodo:
 		tasks = m.state.TodoTasks
-		idx = m.state.SelectedIndices[PanelTodo]
-	case PanelProcessing:
+		idx = m.state.SelectedIndices[state.PanelTodo]
+	case state.PanelProcessing:
 		tasks = m.state.ProcessingTasks
-		idx = m.state.SelectedIndices[PanelProcessing]
+		idx = m.state.SelectedIndices[state.PanelProcessing]
 	}
 
 	if len(tasks) > 0 && idx < len(tasks) {
@@ -44,6 +45,17 @@ func (m Model) renderDetailsPanel() string {
 		items = append(items, selectedItemStyle.Render(fmt.Sprintf("%s %s", icon, selectedTask.Key)))
 		items = append(items, "")
 		items = append(items, itemStyle.Render("⏺ "+selectedTask.Fields.Status.Name))
+
+		// === FIX VERSION (if available) ===
+		if len(selectedTask.Fields.FixVersions) > 0 {
+			versionNames := make([]string, len(selectedTask.Fields.FixVersions))
+			for i, v := range selectedTask.Fields.FixVersions {
+				versionNames[i] = v.Name
+			}
+			fixVersionText := "Fix Version: " + strings.Join(versionNames, ", ")
+			items = append(items, itemStyle.Foreground(colorMuted).Render(fixVersionText))
+		}
+
 		items = append(items, "")
 		items = append(items, itemStyle.Render(selectedTask.Fields.Summary))
 

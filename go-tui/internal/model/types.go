@@ -9,11 +9,12 @@ type Issue struct {
 
 // IssueFields contains the issue field data
 type IssueFields struct {
-	Summary     string      `json:"summary"`
-	Status      Status      `json:"status"`
-	IssueType   IssueType   `json:"issuetype"`
-	Priority    *Priority   `json:"priority,omitempty"`
-	Description interface{} `json:"description,omitempty"`
+	Summary     string       `json:"summary"`
+	Status      Status       `json:"status"`
+	IssueType   IssueType    `json:"issuetype"`
+	Priority    *Priority    `json:"priority,omitempty"`
+	Description interface{}  `json:"description,omitempty"`
+	FixVersions []FixVersion `json:"fixVersions,omitempty"`
 }
 
 // Status represents the issue status
@@ -28,6 +29,11 @@ type IssueType struct {
 
 // Priority represents the issue priority
 type Priority struct {
+	Name string `json:"name"`
+}
+
+// FixVersion represents a fix version
+type FixVersion struct {
 	Name string `json:"name"`
 }
 
