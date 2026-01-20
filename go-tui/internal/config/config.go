@@ -130,6 +130,11 @@ func (m *Manager) GetTheme() string {
 	return m.config.Theme
 }
 
+// GetAutoClipboard returns the auto clipboard setting
+func (m *Manager) GetAutoClipboard() bool {
+	return m.config.AutoClipboard
+}
+
 // GetConfig returns the underlying configuration
 func (m *Manager) GetConfig() *Config {
 	return m.config

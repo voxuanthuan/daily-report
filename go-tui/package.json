@@ -1,13 +1,12 @@
 {
   "name": "jira-report-tui",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Fast, performant terminal interface for managing Jira tasks and logging time to Tempo - 20x faster than TypeScript version",
   "main": "index.js",
   "bin": {
-    "jira-report": "./bin/jira-report"
+    "jira-report": "cli.js"
   },
   "scripts": {
-    "postinstall": "node install.js",
     "build": "./build-all.sh",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -29,7 +28,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/voxuanthuan/daily-report.git",
+    "url": "git+https://github.com/voxuanthuan/daily-report.git",
     "directory": "go-tui"
   },
   "bugs": {
@@ -40,9 +39,7 @@
     "node": ">=14.0.0"
   },
   "os": [
-    "darwin",
-    "linux",
-    "win32"
+    "linux"
   ],
   "cpu": [
     "x64",

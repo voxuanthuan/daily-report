@@ -15,6 +15,7 @@ type IssueFields struct {
 	Priority    *Priority    `json:"priority,omitempty"`
 	Description interface{}  `json:"description,omitempty"`
 	FixVersions []FixVersion `json:"fixVersions,omitempty"`
+	Updated     string       `json:"updated,omitempty"`
 }
 
 // Status represents the issue status

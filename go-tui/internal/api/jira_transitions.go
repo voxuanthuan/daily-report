@@ -6,7 +6,40 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/yourusername/jira-daily-report/internal/jira"
 )
+
+// GetTransitions fetches available status transitions for an issue
+func (c *JiraClient) GetTransitions(issueKey string) ([]jira.Transition, error) {
+	endpoint := fmt.Sprintf("%s/rest/api/3/issue/%s/transitions", c.baseURL, issueKey)
+
+	req, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.SetBasicAuth(c.username, c.apiToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to fetch transitions: %s - %s", resp.Status, string(body))
+	}
+
+	var result jira.TransitionsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return result.Transitions, nil
+}
 
 // TransitionRequest represents the payload for changing an issue status
 type TransitionRequest struct {

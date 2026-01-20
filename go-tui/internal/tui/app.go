@@ -172,12 +172,35 @@ func (m *Model) loadTasksCmd() tea.Msg {
 	// Combine Under Review + Testing for Processing panel
 	processingTasks := append(underReview, testing...)
 
+	// Sort Todo and Processing tasks by updated date
+	todo = sortIssuesByUpdatedDesc(todo)
+	processingTasks = sortIssuesByUpdatedDesc(processingTasks)
+
 	return tasksLoadedMsg{
 		user:            user,
 		reportTasks:     inProgress,
 		todoTasks:       todo,
 		processingTasks: processingTasks,
 	}
+}
+
+// sortIssuesByUpdatedDesc sorts issues by updated date (descending)
+func sortIssuesByUpdatedDesc(issues []model.Issue) []model.Issue {
+	sort.Slice(issues, func(i, j int) bool {
+		t1, err1 := time.Parse("2006-01-02T15:04:05.000-0700", issues[i].Fields.Updated)
+		t2, err2 := time.Parse("2006-01-02T15:04:05.000-0700", issues[j].Fields.Updated)
+
+		// If parsing fails, push to bottom
+		if err1 != nil {
+			return false
+		}
+		if err2 != nil {
+			return true
+		}
+
+		return t1.After(t2)
+	})
+	return issues
 }
 
 // loadWorklogsCmd fetches worklogs and enriches them (background - Phase 2)
@@ -674,49 +697,24 @@ func (m Model) handleChangeStatus() (Model, tea.Cmd) {
 	issueKey := selectedTask.Key
 	currentStatus := selectedTask.Fields.Status.Name
 
-	// Define static status options (lazy fetch execution)
-	options := []string{
-		"Selected for Development",
-		"In Progress",
-		"Code Review",
-		"Ready for QA",
+	// Fetch transitions from Jira
+	m.state.StatusMessage = fmt.Sprintf("Fetching transitions for %s...", issueKey)
+	return m, m.fetchTransitionsCmd(issueKey, currentStatus)
+}
+
+// fetchTransitionsCmd fetches available transitions from Jira
+func (m Model) fetchTransitionsCmd(issueKey, currentStatus string) tea.Cmd {
+	return func() tea.Msg {
+		transitions, err := m.jiraClient.GetTransitions(issueKey)
+		if err != nil {
+			return errMsg{err}
+		}
+		return transitionsFetchedMsg{
+			transitions: transitions,
+			issueKey:    issueKey,
+			status:      currentStatus,
+		}
 	}
-
-	// Create simplified transitions logic
-	transitions := make([]jira.Transition, len(options))
-	for i, opt := range options {
-		// We construct the struct manually matching internal/jira/transitions.go logic
-		// logic: type Transition struct { ... To struct { Name string } ... }
-		// But in app.go we can't use anonymous struct literal if we assigning to named type field unless compatible.
-		// jira.Transition is defined in another package.
-		// We need to set the field.
-		// Since 'To' is an anonymous struct field in jira.Transition, we can't assign to it easily without same structure.
-		// Wait, if 'To' is exported (it is), we can assign to it.
-		// jira.Transition{To: struct{Name string}{Name: opt}} works if structure is identical.
-
-		t := jira.Transition{}
-		// Assignment to embedded/anonymous struct field from different package requires creating the struct
-		// Go allows implicit assignment if compatible? No.
-		// Actually, since it is defined as `To struct {Name string}`, I can't instantiate it directly from here easily
-		// unless I use reflection or if I modify jira package to have a named type for To.
-		// OR I can use JSON unmarshal trick!
-		// But that's ugly.
-
-		// Let's modify jira.Transition to have a named type for 'To'?
-		// No, `internal/jira/transitions.go` has `To struct { Name string }`.
-		// I can't write `t.To = struct{Name string}{Name: opt}` in Go if types are not identical.
-		// They are identical in structure (both anonymous structs with one string field).
-		// Go allows conversion.
-
-		// Let's try:
-		// t.To.Name = opt (since it's a struct value, I can assign fields)
-		t.To.Name = opt
-		transitions[i] = t
-	}
-
-	m.statusModal = NewStatusDialogModel(transitions, currentStatus, issueKey)
-	m.state.StatusMessage = "Select new status"
-	return m, nil
 }
 
 // View renders the TUI
