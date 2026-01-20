@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	date        string
-	description string
+	date          string
+	description   string
+	logtimeSilent bool
 )
 
 type timeEntry struct {
@@ -38,7 +39,7 @@ Separated by comma. Supported units: h, m.`,
 			log.Fatalf("Failed to load configuration: %v", err)
 		}
 
-		if !silent {
+		if !logtimeSilent {
 			fmt.Println("Processing time logs...")
 		}
 
@@ -101,7 +102,7 @@ Separated by comma. Supported units: h, m.`,
 				continue
 			}
 
-			if !silent {
+			if !logtimeSilent {
 				fmt.Printf("⏳ Logging %s to %s...\n", entry.duration, entry.key)
 			}
 
@@ -134,7 +135,7 @@ Separated by comma. Supported units: h, m.`,
 			}
 		}
 
-		if !silent {
+		if !logtimeSilent {
 			fmt.Printf("\nSuccessfully logged %d/%d entries.\n", successCount, len(entryList))
 		}
 	},
@@ -201,7 +202,7 @@ func parseDuration(input string) (int, error) {
 func init() {
 	logtimeCmd.Flags().StringVarP(&date, "date", "d", "today", "Date to log time (today, yesterday, YYYY-MM-DD)")
 	logtimeCmd.Flags().StringVar(&description, "description", "", "Worklog description")
-	logtimeCmd.Flags().BoolVarP(&silent, "silent", "s", false, "Suppress info messages")
+	logtimeCmd.Flags().BoolVarP(&logtimeSilent, "silent", "s", false, "Suppress info messages")
 
 	rootCmd.AddCommand(logtimeCmd)
 }

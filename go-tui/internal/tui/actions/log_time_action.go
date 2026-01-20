@@ -9,7 +9,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/yourusername/jira-daily-report/internal/model"
 	"github.com/yourusername/jira-daily-report/internal/tui/state"
 )
 
@@ -114,24 +113,9 @@ func (a *LogTimeAction) Execute(ctx ActionContext) tea.Cmd {
 
 // OptimisticUpdate adds the worklog to state immediately
 func (a *LogTimeAction) OptimisticUpdate(s *state.State) *state.State {
-	// Save snapshot for potential rollback
-	s.StateSnapshot = SaveStateSnapshot(s)
-
-	// Create optimistic worklog entry
-	optimisticWorklog := model.Worklog{
-		Issue: model.WorklogIssue{
-			Key: a.taskKey,
-			// ID: issueID, // We could parse a.taskID to int here if needed
-		},
-		TimeSpentSeconds: a.timeSeconds,
-		StartDate:        a.date,
-		Description:      a.description,
-		// Author: model.Author{AccountID: a.accountID}, // Optional but good for completeness
-	}
-
-	// Add to state
-	AddWorklogToState(s, optimisticWorklog)
-
+	// TODO: Implement optimistic updates
+	// For now, just set a loading message
+	s.StatusMessage = fmt.Sprintf("Logging %s to %s...", a.timeValue, a.taskKey)
 	return s
 }
 
@@ -154,14 +138,9 @@ func (a *LogTimeAction) OnSuccess(s *state.State, result interface{}) *state.Sta
 	return s
 }
 
-// OnError rolls back the optimistic worklog
+// OnError handles failure
 func (a *LogTimeAction) OnError(s *state.State, err error) *state.State {
-	// Rollback to snapshot
-	if s.StateSnapshot != nil {
-		RestoreFromSnapshot(s, s.StateSnapshot)
-		s.StateSnapshot = nil
-	}
-
+	s.StatusMessage = fmt.Sprintf("Failed to log time: %v", err)
 	s.CurrentAction = nil
 	return s
 }

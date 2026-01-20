@@ -86,19 +86,9 @@ func (a *ChangeStatusAction) Execute(ctx ActionContext) tea.Cmd {
 
 // OptimisticUpdate moves the task to the target panel immediately
 func (a *ChangeStatusAction) OptimisticUpdate(s *state.State) *state.State {
-	// Save snapshot for potential rollback
-	s.StateSnapshot = SaveStateSnapshot(s)
-
-	// Find the task and update its status
-	UpdateTaskInState(s, a.taskKey, func(task *model.Issue) {
-		task.Fields.Status.Name = a.targetStatus
-	})
-
-	// Move task between panels if needed
-	if a.sourcePanel != a.targetPanel {
-		MoveTaskBetweenPanels(s, a.taskKey, a.sourcePanel, a.targetPanel)
-	}
-
+	// TODO: Implement optimistic updates
+	// For now, just set a loading message
+	s.StatusMessage = fmt.Sprintf("Changing status to %s...", a.targetStatus)
 	return s
 }
 
@@ -118,14 +108,8 @@ func (a *ChangeStatusAction) OnSuccess(s *state.State, result interface{}) *stat
 	return s
 }
 
-// OnError rolls back the status change
+// OnError handles failure
 func (a *ChangeStatusAction) OnError(s *state.State, err error) *state.State {
-	// Rollback to snapshot
-	if s.StateSnapshot != nil {
-		RestoreFromSnapshot(s, s.StateSnapshot)
-		s.StateSnapshot = nil
-	}
-
 	s.StatusMessage = fmt.Sprintf("Failed to change status: %v", err)
 	s.CurrentAction = nil
 	return s

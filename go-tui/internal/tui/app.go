@@ -518,10 +518,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Rollback optimistic updates if snapshot exists
-		if m.state.StateSnapshot != nil {
-			actions.RestoreFromSnapshot(m.state, m.state.StateSnapshot)
-			m.state.StateSnapshot = nil
-		}
+		// TODO: Implement state snapshots
+		m.state.StateSnapshot = nil
 		// Show error message
 		m.state.StatusMessage = fmt.Sprintf("Error: %v", msg.Error)
 		m.state.CurrentAction = nil
