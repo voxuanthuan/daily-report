@@ -9,39 +9,39 @@ import (
 	"github.com/yourusername/jira-daily-report/internal/model"
 )
 
-// BuildMainReport builds the main section (Yesterday, Today, Blockers)
 func BuildMainReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDate time.Time) string {
 	var sb strings.Builder
 
-	// Smart date label
 	label := "Yesterday"
 	if !prevDate.IsZero() {
-		weekday := prevDate.Weekday().String()[:3]
-		if time.Since(prevDate).Hours() > 48 {
+		today := time.Now()
+		daysDiff := int(today.Sub(prevDate).Hours() / 24)
+
+		if daysDiff > 1 {
+			weekday := prevDate.Weekday().String()
 			label = fmt.Sprintf("Last %s", weekday)
-		} else {
-			label = fmt.Sprintf("Yesterday (%s)", weekday)
 		}
 	}
 
-	sb.WriteString(fmt.Sprintf("\nHi everyone,\n%s\n", label))
+	sb.WriteString("Hi everyone,\n")
+	sb.WriteString(label + "\n")
 
-	// Deduplicate previous tasks
 	uniquePrev := deduplicateWorklogs(prevTasks)
 	if len(uniquePrev) > 0 {
 		for _, w := range uniquePrev {
-			sb.WriteString(fmt.Sprintf("- %s: %s\n", w.Issue.Key, w.Issue.Summary))
+			sb.WriteString(fmt.Sprintf("● %s: %s\n", w.Issue.Key, w.Issue.Summary))
+			if w.Description != "" {
+				sb.WriteString(fmt.Sprintf("  ○ %s\n", w.Description))
+			}
 		}
 	} else {
-		sb.WriteString("- No tasks logged.\n")
+		sb.WriteString("● No tasks logged.\n")
 	}
 
-	sb.WriteString("\nToday\n")
+	sb.WriteString("Today\n")
 
-	// Deduplicate in progress
 	uniqueInProgress := deduplicateIssues(inProgress)
 
-	// Separate stories/epics
 	var stories []model.Issue
 	var tasks []model.Issue
 
@@ -57,22 +57,20 @@ func BuildMainReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDa
 
 	if len(tasks) > 0 {
 		for _, t := range tasks {
-			sb.WriteString(fmt.Sprintf("- %s: %s\n", t.Key, t.Fields.Summary))
+			sb.WriteString(fmt.Sprintf("● %s: %s\n", t.Key, t.Fields.Summary))
 		}
 	} else {
-		sb.WriteString("- No tasks planned.\n")
+		sb.WriteString("● No tasks planned.\n")
 	}
 
-	sb.WriteString("\nNo blockers\n")
+	sb.WriteString("No blockers\n")
 
 	if len(stories) > 0 {
-		sb.WriteString("\n.\n\nIn-Progress (Story)\n")
+		sb.WriteString("\nIn-Progress (Story)\n")
 		for _, s := range stories {
-			sb.WriteString(fmt.Sprintf("- %s: %s\n", s.Key, s.Fields.Summary))
+			sb.WriteString(fmt.Sprintf("● %s: %s\n", s.Key, s.Fields.Summary))
 		}
 	}
-
-	sb.WriteString("\n")
 
 	return sb.String()
 }
