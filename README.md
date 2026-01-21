@@ -4,7 +4,7 @@ A CLI tool for daily Jira reporting and Tempo time logging from your terminal.
 
 ## 🎬
 
-![Demo](https://raw.githubusercontent.com/voxuanthuan/daily-report/main/images/promo.gif)
+![Demo](https://raw.githubusercontent.com/voxuanthuan/daily-report/feature/web-app/images/promo.gif)
 
 
 ## Installation
