@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/yourusername/jira-daily-report/internal/tui/state"
 	"fmt"
 
 	"github.com/jroimartin/gocui"
@@ -85,15 +86,15 @@ func (gui *Gui) renderDetailsPanel(v *gocui.View) {
 	var idx int
 
 	switch gui.state.ActivePanel {
-	case PanelReport:
+	case state.PanelReport:
 		tasks = gui.state.ReportTasks
-		idx = gui.state.SelectedIndices[PanelReport]
-	case PanelTodo:
+		idx = gui.state.SelectedIndices[state.PanelReport]
+	case state.PanelTodo:
 		tasks = gui.state.TodoTasks
-		idx = gui.state.SelectedIndices[PanelTodo]
-	case PanelProcessing:
+		idx = gui.state.SelectedIndices[state.PanelTodo]
+	case state.PanelProcessing:
 		tasks = gui.state.ProcessingTasks
-		idx = gui.state.SelectedIndices[PanelProcessing]
+		idx = gui.state.SelectedIndices[state.PanelProcessing]
 	}
 
 	if len(tasks) > 0 && idx < len(tasks) {

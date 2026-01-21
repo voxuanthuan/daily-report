@@ -10,26 +10,29 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/yourusername/jira-daily-report/internal/api"
 	"github.com/yourusername/jira-daily-report/internal/model"
 )
 
 // LogTimeModal represents the log time modal state
 type LogTimeModal struct {
-	task       *model.Issue
-	mode       int // 0=menu, 1=time input, 2=description input, 3=date input, 4=confirm
-	menuChoice int // 0=quick, 1=with desc, 2=full
-	timeInput  textinput.Model
-	descInput  textinput.Model
-	dateInput  textinput.Model
-	timeValue  string
-	descValue  string
-	dateValue  string
-	err        string
-	active     bool
+	task          *model.Issue
+	mode          int // 0=menu, 1=time input, 2=description input, 3=date input, 4=confirm
+	menuChoice    int // 0=quick, 1=with desc, 2=full
+	timeInput     textinput.Model
+	descInput     textinput.Model
+	dateInput     textinput.Model
+	timeValue     string
+	descValue     string
+	dateValue     string
+	err           string
+	active        bool
+	tempoClient   *api.TempoClient
+	userAccountID string
 }
 
 // NewLogTimeModal creates a new log time modal
-func NewLogTimeModal(task *model.Issue) *LogTimeModal {
+func NewLogTimeModal(task *model.Issue, tempoClient *api.TempoClient, userAccountID string) *LogTimeModal {
 	ti := textinput.New()
 	ti.Placeholder = "e.g., 2h, 1.5h, 30m"
 	ti.Focus()
@@ -47,14 +50,16 @@ func NewLogTimeModal(task *model.Issue) *LogTimeModal {
 	dti.Width = 40
 
 	return &LogTimeModal{
-		task:       task,
-		mode:       0, // Start with menu
-		menuChoice: 0,
-		timeInput:  ti,
-		descInput:  di,
-		dateInput:  dti,
-		dateValue:  "today",
-		active:     true,
+		task:          task,
+		mode:          0, // Start with menu
+		menuChoice:    0,
+		timeInput:     ti,
+		descInput:     di,
+		dateInput:     dti,
+		dateValue:     "today",
+		active:        true,
+		tempoClient:   tempoClient,
+		userAccountID: userAccountID,
 	}
 }
 
@@ -317,46 +322,21 @@ func (m *LogTimeModal) renderConfirm() string {
 		itemStyle.Foreground(colorError).Render("[N/ESC] Cancel")
 }
 
+// logTimeSubmittedMsg is sent when time log is submitted
+type logTimeSubmittedMsg struct {
+	timeValue   string
+	description string
+	date        string
+	task        *model.Issue
+}
+
 func (m *LogTimeModal) submitWorklog() tea.Cmd {
 	return func() tea.Msg {
-		// Parse time to seconds
-		seconds, err := parseTimeString(m.timeValue)
-		if err != nil {
-			return statusMessage{
-				message: fmt.Sprintf("Error: %v", err),
-				isError: true,
-				refresh: false,
-			}
-		}
-
-		// Parse issue ID from task
-		issueID, err := strconv.Atoi(m.task.ID)
-		if err != nil {
-			return statusMessage{
-				message: fmt.Sprintf("Error: invalid issue ID"),
-				isError: true,
-				refresh: false,
-			}
-		}
-
-		// NOTE: Actual API call would go here
-		// For now, we'll return success and trigger refresh
-		// TODO: Uncomment and use when tempoClient is available
-		_ = seconds // Will use when API is implemented
-		_ = issueID // Will use when API is implemented
-		// _, err = tempoClient.CreateWorklog(issueID, seconds, m.dateValue, m.descValue, userAccountID)
-		// if err != nil {
-		//     return statusMessage{
-		//         message: fmt.Sprintf("Failed to log time: %v", err),
-		//         isError: true,
-		//         refresh: false,
-		//     }
-		// }
-
-		return statusMessage{
-			message: fmt.Sprintf("✓ Logged %s to %s", m.timeValue, m.task.Key),
-			isError: false,
-			refresh: true, // Trigger progressive refresh
+		return logTimeSubmittedMsg{
+			timeValue:   m.timeValue,
+			description: m.descValue,
+			date:        m.dateValue,
+			task:        m.task,
 		}
 	}
 }

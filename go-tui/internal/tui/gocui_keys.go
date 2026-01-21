@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/yourusername/jira-daily-report/internal/tui/state"
 	"github.com/jroimartin/gocui"
 )
 
@@ -74,7 +75,7 @@ func quit(g *gocui.Gui, v *gocui.View) error {
 
 // switchToReport switches to the Report panel
 func (gui *Gui) switchToReport(g *gocui.Gui, v *gocui.View) error {
-	gui.state.ActivePanel = PanelReport
+	gui.state.ActivePanel = state.PanelReport
 	if _, err := g.SetCurrentView("report"); err != nil {
 		return err
 	}
@@ -83,7 +84,7 @@ func (gui *Gui) switchToReport(g *gocui.Gui, v *gocui.View) error {
 
 // switchToTodo switches to the Todo panel
 func (gui *Gui) switchToTodo(g *gocui.Gui, v *gocui.View) error {
-	gui.state.ActivePanel = PanelTodo
+	gui.state.ActivePanel = state.PanelTodo
 	if _, err := g.SetCurrentView("todo"); err != nil {
 		return err
 	}
@@ -92,7 +93,7 @@ func (gui *Gui) switchToTodo(g *gocui.Gui, v *gocui.View) error {
 
 // switchToProcessing switches to the Processing panel
 func (gui *Gui) switchToProcessing(g *gocui.Gui, v *gocui.View) error {
-	gui.state.ActivePanel = PanelProcessing
+	gui.state.ActivePanel = state.PanelProcessing
 	if _, err := g.SetCurrentView("processing"); err != nil {
 		return err
 	}
@@ -101,7 +102,7 @@ func (gui *Gui) switchToProcessing(g *gocui.Gui, v *gocui.View) error {
 
 // switchToTimelog switches to the Timelog panel
 func (gui *Gui) switchToTimelog(g *gocui.Gui, v *gocui.View) error {
-	gui.state.ActivePanel = PanelTimelog
+	gui.state.ActivePanel = state.PanelTimelog
 	if _, err := g.SetCurrentView("timelog"); err != nil {
 		return err
 	}
@@ -122,13 +123,13 @@ func (gui *Gui) nextPanel(g *gocui.Gui, v *gocui.View) error {
 			// Update active panel state
 			switch next {
 			case "report":
-				gui.state.ActivePanel = PanelReport
+				gui.state.ActivePanel = state.PanelReport
 			case "todo":
-				gui.state.ActivePanel = PanelTodo
+				gui.state.ActivePanel = state.PanelTodo
 			case "processing":
-				gui.state.ActivePanel = PanelProcessing
+				gui.state.ActivePanel = state.PanelProcessing
 			case "timelog":
-				gui.state.ActivePanel = PanelTimelog
+				gui.state.ActivePanel = state.PanelTimelog
 			}
 			break
 		}
@@ -198,13 +199,13 @@ func (gui *Gui) panelLeft(g *gocui.Gui, v *gocui.View) error {
 	switch current {
 	case "details":
 		// From details to report
-		gui.state.ActivePanel = PanelReport
+		gui.state.ActivePanel = state.PanelReport
 		if _, err := g.SetCurrentView("report"); err != nil {
 			return err
 		}
 	case "timelog":
 		// From timelog to processing
-		gui.state.ActivePanel = PanelProcessing
+		gui.state.ActivePanel = state.PanelProcessing
 		if _, err := g.SetCurrentView("processing"); err != nil {
 			return err
 		}
@@ -233,13 +234,13 @@ func (gui *Gui) panelRight(g *gocui.Gui, v *gocui.View) error {
 	switch current {
 	case "report", "todo":
 		// From left column to details
-		gui.state.ActivePanel = PanelDetails
+		gui.state.ActivePanel = state.PanelDetails
 		if _, err := g.SetCurrentView("details"); err != nil {
 			return err
 		}
 	case "processing":
 		// From processing to timelog
-		gui.state.ActivePanel = PanelTimelog
+		gui.state.ActivePanel = state.PanelTimelog
 		if _, err := g.SetCurrentView("timelog"); err != nil {
 			return err
 		}

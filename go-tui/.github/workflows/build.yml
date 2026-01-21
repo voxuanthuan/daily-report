@@ -1,0 +1,80 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: go-tui/go.sum
+
+      - name: Download dependencies
+        working-directory: ./go-tui
+        run: go mod download
+
+      - name: Build for Linux
+        working-directory: ./go-tui
+        run: go build -o bin/jira-report ./cmd/jira-report
+
+      - name: Verify binary
+        working-directory: ./go-tui
+        run: ./bin/jira-report --help
+
+      - name: Build all platforms
+        working-directory: ./go-tui
+        run: |
+          chmod +x build-all.sh
+          ./build-all.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jira-report-binaries
+          path: go-tui/bin/jira-report-*
+          retention-days: 7
+
+  test-npm-package:
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: go-tui/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Build binaries
+        working-directory: ./go-tui
+        run: |
+          chmod +x build-all.sh
+          ./build-all.sh
+
+      - name: Test npm package
+        working-directory: ./go-tui
+        run: |
+          npm pack
+          mkdir -p /tmp/test-install
+          cd /tmp/test-install
+          npm install $GITHUB_WORKSPACE/go-tui/jira-report-tui-*.tgz
+          npx jira-report --help

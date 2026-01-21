@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/yourusername/jira-daily-report/internal/tui/state"
 	"fmt"
 
 	"github.com/jroimartin/gocui"
@@ -13,28 +14,28 @@ func (gui *Gui) showLogTimeModal(g *gocui.Gui, v *gocui.View) error {
 	var idx int
 
 	switch gui.state.ActivePanel {
-	case PanelReport:
+	case state.PanelReport:
 		for _, t := range gui.state.ReportTasks {
 			tasks = append(tasks, t)
 		}
-		idx = gui.state.SelectedIndices[PanelReport]
-	case PanelTodo:
+		idx = gui.state.SelectedIndices[state.PanelReport]
+	case state.PanelTodo:
 		for _, t := range gui.state.TodoTasks {
 			tasks = append(tasks, t)
 		}
-		idx = gui.state.SelectedIndices[PanelTodo]
-	case PanelProcessing:
+		idx = gui.state.SelectedIndices[state.PanelTodo]
+	case state.PanelProcessing:
 		for _, t := range gui.state.ProcessingTasks {
 			tasks = append(tasks, t)
 		}
-		idx = gui.state.SelectedIndices[PanelProcessing]
+		idx = gui.state.SelectedIndices[state.PanelProcessing]
 	default:
-		gui.state.StatusMessage = "No task panel selected"
+		gui.state.StatusMessage = ""
 		return nil
 	}
 
 	if len(tasks) == 0 || idx >= len(tasks) {
-		gui.state.StatusMessage = "No task selected"
+		gui.state.StatusMessage = ""
 		return nil
 	}
 
@@ -101,19 +102,19 @@ func (gui *Gui) closeModal(g *gocui.Gui, v *gocui.View) error {
 
 	// Return to the previous panel
 	switch gui.state.ActivePanel {
-	case PanelReport:
+	case state.PanelReport:
 		if _, err := g.SetCurrentView("report"); err != nil {
 			return err
 		}
-	case PanelTodo:
+	case state.PanelTodo:
 		if _, err := g.SetCurrentView("todo"); err != nil {
 			return err
 		}
-	case PanelProcessing:
+	case state.PanelProcessing:
 		if _, err := g.SetCurrentView("processing"); err != nil {
 			return err
 		}
-	case PanelTimelog:
+	case state.PanelTimelog:
 		if _, err := g.SetCurrentView("timelog"); err != nil {
 			return err
 		}

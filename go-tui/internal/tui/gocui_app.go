@@ -1,8 +1,8 @@
 package tui
 
 import (
+	"github.com/yourusername/jira-daily-report/internal/tui/state"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -14,7 +14,7 @@ import (
 // Gui represents the gocui application
 type Gui struct {
 	g           *gocui.Gui
-	state       *State
+	state       *state.State
 	jiraClient  *api.JiraClient
 	tempoClient *api.TempoClient
 	config      *config.Manager
@@ -61,7 +61,7 @@ func NewGui(cfg *config.Manager) (*Gui, error) {
 
 	gui := &Gui{
 		g:           g,
-		state:       NewState(),
+		state:       state.NewState(),
 		jiraClient:  jiraClient,
 		tempoClient: tempoClient,
 		config:      cfg,
@@ -197,7 +197,7 @@ func (gui *Gui) Close() {
 // loadData loads initial data from Jira and Tempo
 func (gui *Gui) loadData() {
 	gui.state.Loading = true
-	gui.state.StatusMessage = "Loading data..."
+	gui.state.StatusMessage = ""
 	gui.g.Update(func(g *gocui.Gui) error {
 		return nil
 	})
@@ -205,7 +205,7 @@ func (gui *Gui) loadData() {
 	// Fetch current user
 	user, err := gui.jiraClient.FetchCurrentUser()
 	if err != nil {
-		log.Printf("Error fetching user: %v", err)
+		// Error fetching user
 		gui.state.Error = err
 		gui.state.Loading = false
 		return
@@ -217,7 +217,7 @@ func (gui *Gui) loadData() {
 	// Fetch tasks
 	inProgress, err := gui.jiraClient.FetchInProgressTasks(username)
 	if err != nil {
-		log.Printf("Error fetching in progress tasks: %v", err)
+		// Error fetching in progress tasks
 		gui.state.Error = err
 		gui.state.Loading = false
 		return
@@ -226,7 +226,7 @@ func (gui *Gui) loadData() {
 
 	todo, err := gui.jiraClient.FetchOpenTasks(username)
 	if err != nil {
-		log.Printf("Error fetching todo tasks: %v", err)
+		// Error fetching todo tasks
 		gui.state.Error = err
 		gui.state.Loading = false
 		return
@@ -235,7 +235,7 @@ func (gui *Gui) loadData() {
 
 	underReview, err := gui.jiraClient.FetchUnderReviewTasks(username)
 	if err != nil {
-		log.Printf("Error fetching under review tasks: %v", err)
+		// Error fetching under review tasks
 		gui.state.Error = err
 		gui.state.Loading = false
 		return
@@ -243,7 +243,7 @@ func (gui *Gui) loadData() {
 
 	testing, err := gui.jiraClient.FetchReadyForTestingTasks(username)
 	if err != nil {
-		log.Printf("Error fetching testing tasks: %v", err)
+		// Error fetching testing tasks
 		gui.state.Error = err
 		gui.state.Loading = false
 		return
@@ -254,7 +254,7 @@ func (gui *Gui) loadData() {
 	// Fetch worklogs
 	worklogs, err := gui.tempoClient.FetchLastSixDaysWorklogs(user.AccountID)
 	if err != nil {
-		log.Printf("Error fetching worklogs: %v", err)
+		// Error fetching worklogs
 		gui.state.Error = err
 		gui.state.Loading = false
 		return
@@ -262,7 +262,7 @@ func (gui *Gui) loadData() {
 
 	enriched, err := gui.tempoClient.EnrichWorklogsWithIssueDetails(worklogs)
 	if err != nil {
-		log.Printf("Error enriching worklogs: %v", err)
+		// Error enriching worklogs
 		gui.state.Error = err
 		gui.state.Loading = false
 		return
@@ -271,9 +271,7 @@ func (gui *Gui) loadData() {
 	gui.state.Worklogs = enriched
 	gui.state.DateGroups = groupWorklogsByDate(enriched)
 	gui.state.Loading = false
-	gui.state.StatusMessage = fmt.Sprintf("Loaded %d tasks, %d worklogs",
-		len(inProgress)+len(todo)+len(gui.state.ProcessingTasks),
-		len(enriched))
+	gui.state.StatusMessage = ""
 
 	// Update UI
 	gui.g.Update(func(g *gocui.Gui) error {
