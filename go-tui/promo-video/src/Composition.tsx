@@ -2,7 +2,6 @@ import { AbsoluteFill, Sequence, Img, staticFile } from 'remotion';
 import { Scene1 } from './scenes/Scene1';
 import { Scene2 } from './scenes/Scene2';
 import { Scene3 } from './scenes/Scene3';
-import { Subtitles } from './components/Subtitles';
 
 export const MainComposition = () => {
   return (
@@ -21,9 +20,6 @@ export const MainComposition = () => {
       <Sequence from={210} durationInFrames={150}>
         <Scene3 />
       </Sequence>
-
-      {/* Subtitles overlay on all scenes */}
-      <Subtitles />
     </AbsoluteFill>
   );
 };

@@ -1,10 +1,10 @@
 {
   "name": "jira-report-tui",
-  "version": "1.0.7",
+  "version": "1.0.9",
   "description": "Fast, performant terminal interface for managing Jira tasks and logging time to Tempo - 20x faster than TypeScript version",
   "main": "index.js",
   "bin": {
-    "jira-report": "cli.js"
+    "jira-report-tui": "cli.js"
   },
   "scripts": {
     "build": "./build-all.sh",
@@ -39,7 +39,9 @@
     "node": ">=14.0.0"
   },
   "os": [
-    "linux"
+    "linux",
+    "darwin",
+    "win32"
   ],
   "cpu": [
     "x64",

@@ -17,11 +17,15 @@ internal/
 build.sh
 test-progressive-loading.sh
 build-all.sh
+
+# Root-level binaries (duplicates)
+jira-report
 jira-tui
 
 # npm artifacts
 *.tgz
 node_modules/
+package-lock.json
 
 # Git
 .git
@@ -33,9 +37,9 @@ node_modules/
 *.swp
 *.swo
 
-# Keep only what's needed for npm
-!bin/
-!package.json
-!install.js
-!README.md
-!LICENSE
+# Video/promo content (large files)
+promo-video/
+video-intro/
+
+# GitHub workflows
+.github/

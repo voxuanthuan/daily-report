@@ -44,8 +44,6 @@ export const Scene1: React.FC = () => {
         />
       </AbsoluteFill>
 
-
-
       {/* Text overlay */}
       <AbsoluteFill
         style={{
@@ -67,7 +65,7 @@ export const Scene1: React.FC = () => {
             lineHeight: 1.2,
           }}
         >
-          Spending hours on<br />daily Jira reports?
+          Spending 5-10 minutes<br />on daily reports?
         </h1>
       </AbsoluteFill>
     </AbsoluteFill>
