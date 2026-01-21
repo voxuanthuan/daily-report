@@ -245,7 +245,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case tea.KeyMsg:
-		// Handle modal input first if any modal is active
 		if m.logTimeModal != nil && m.logTimeModal.active {
 			updatedModal, cmd := m.logTimeModal.Update(msg)
 			m.logTimeModal = updatedModal
@@ -254,6 +253,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.copyOptionsModal != nil && m.copyOptionsModal.active {
 			updatedModal, cmd := m.copyOptionsModal.Update(msg)
 			m.copyOptionsModal = updatedModal
+			return m, cmd
+		}
+		if m.reportPreviewModal != nil && m.reportPreviewModal.IsActive() {
+			updatedModal, cmd := m.reportPreviewModal.Update(msg)
+			m.reportPreviewModal = updatedModal
 			return m, cmd
 		}
 		if m.statusModal != nil && m.statusModal.IsActive() {
