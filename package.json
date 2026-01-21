@@ -2,7 +2,7 @@
   "name": "jira-daily-report",
   "displayName": "jira-daily-report",
   "description": "Generate Jira daily standup reports - TUI CLI tool",
-  "version": "0.1.155",
+  "version": "0.1.158",
   "publisher": "thuanvo",
   "author": {
     "name": "Thuan Vo",

@@ -5,9 +5,11 @@
 
 A CLI tool for daily Jira reporting and Tempo time logging from your terminal.
 
-https://github.com/user-attachments/assets/your-video-id/promo.mp4
+## 🎬
 
-> **Note:** Upload the video from `go-tui/promo-video/out/promo.mp4` to your GitHub repository's releases or use a service like GitHub's asset hosting to get a permanent URL, then replace the URL above.
+![Demo](https://raw.githubusercontent.com/voxuanthuan/daily-report/main/images/promo.gif)
+
+
 
 ## Installation
 ```bash
