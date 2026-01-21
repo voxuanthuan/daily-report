@@ -20,22 +20,23 @@ import (
 
 // Model represents the Bubbletea application model
 type Model struct {
-	state            *state.State
-	actionExecutor   *actions.ActionExecutor
-	activePoller     *refresh.Poller // Currently active poller, nil if none
-	refreshConfig    refresh.Config  // Polling configuration
-	showingHistory   bool            // Whether the history overlay is visible
-	keys             KeyMap
-	width            int
-	height           int
-	jiraClient       *api.JiraClient
-	tempoClient      *api.TempoClient
-	config           *config.Manager
-	logTimeModal     *LogTimeModal     // Active log time modal (nil if not shown)
-	copyOptionsModal *CopyOptionsModal // Active copy options modal (nil if not shown)
-	statusModal      *StatusDialogModel
-	lastKey          string // Track last key press for sequences like 'yy'
-	spinner          spinner.Model
+	state              *state.State
+	actionExecutor     *actions.ActionExecutor
+	activePoller       *refresh.Poller
+	refreshConfig      refresh.Config
+	showingHistory     bool
+	keys               KeyMap
+	width              int
+	height             int
+	jiraClient         *api.JiraClient
+	tempoClient        *api.TempoClient
+	config             *config.Manager
+	logTimeModal       *LogTimeModal
+	copyOptionsModal   *CopyOptionsModal
+	reportPreviewModal *ReportPreviewModal
+	statusModal        *StatusDialogModel
+	lastKey            string
+	spinner            spinner.Model
 }
 
 type transitionsFetchedMsg struct {
