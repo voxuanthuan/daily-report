@@ -359,7 +359,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case copyDoneMsg:
 		m.state.StatusMessage = msg.message
-		m.copyOptionsModal = nil // Close modal
+		m.copyOptionsModal = nil
+		return m, nil
+
+	case reportCopiedMsg:
+		m.state.StatusMessage = msg.message
+		m.reportPreviewModal = nil
 		return m, nil
 
 	case delayedRefreshMsg:
@@ -642,10 +647,7 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "c":
-		// Copy task key to clipboard using new action framework
-		ctx := actions.NewActionContext(m.state, m.jiraClient, m.tempoClient, m.config)
-		action := actions.NewCopyKeyAction()
-		return m, m.actionExecutor.ExecuteAction(action, ctx)
+		return m.showReportPreviewModal()
 
 	case "i":
 		// Show log time modal
@@ -842,14 +844,11 @@ func (m Model) View() string {
 		return strings.Join(overlayLines, "\n")
 	}
 
-	// Overlay copy options modal if active
 	if m.copyOptionsModal != nil && m.copyOptionsModal.active {
-		// Simple centered rendering
 		modalView := m.copyOptionsModal.View()
 		modalLines := strings.Split(modalView, "\n")
 		baseLines := strings.Split(baseView, "\n")
 
-		// Position modal in center
 		startY := (m.height - len(modalLines)) / 2
 		if startY < 0 {
 			startY = 0
@@ -858,7 +857,35 @@ func (m Model) View() string {
 		overlayLines := make([]string, len(baseLines))
 		copy(overlayLines, baseLines)
 
-		// Overlay modal lines
+		for i, modalLine := range modalLines {
+			lineY := startY + i
+			if lineY >= 0 && lineY < len(overlayLines) {
+				modalLineWidth := lipgloss.Width(modalLine)
+				leftPadding := (m.width - modalLineWidth) / 2
+				if leftPadding < 0 {
+					leftPadding = 0
+				}
+				centeredLine := strings.Repeat(" ", leftPadding) + modalLine
+				overlayLines[lineY] = centeredLine
+			}
+		}
+
+		return strings.Join(overlayLines, "\n")
+	}
+
+	if m.reportPreviewModal != nil && m.reportPreviewModal.IsActive() {
+		modalView := m.reportPreviewModal.View()
+		modalLines := strings.Split(modalView, "\n")
+		baseLines := strings.Split(baseView, "\n")
+
+		startY := (m.height - len(modalLines)) / 2
+		if startY < 0 {
+			startY = 0
+		}
+
+		overlayLines := make([]string, len(baseLines))
+		copy(overlayLines, baseLines)
+
 		for i, modalLine := range modalLines {
 			lineY := startY + i
 			if lineY >= 0 && lineY < len(overlayLines) {
@@ -1262,10 +1289,8 @@ func (m Model) renderDetailsPanelWithSize(width, height int) string {
 	return RenderWithTitleAndCounter(content, width, height, borderTitle, counter, isActive, RoundedBorder)
 }
 
-// renderStatusBar renders the status bar
-// renderStatusBar renders the status bar
 func (m Model) renderStatusBar() string {
-	helpText := "q: quit | j/k: move | 1/2/3/0: panels | o: open | yy: copy | r: refresh | i: log time | H: history"
+	helpText := "q: quit | j/k: move | 1/2/3/0: panels | o: open | c: copy report | yy: copy task | r: refresh | i: log time | H: history"
 
 	// Add loading spinner if active (without text)
 	if m.state.Loading || m.activePoller != nil {

@@ -33,56 +33,58 @@ export const Scene2: React.FC = () => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0d1117', opacity: bgOpacity }}>
-      {/* Terminal window */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '10%',
-          left: '10%',
-          right: '10%',
-          padding: '30px',
-          backgroundColor: '#161b22',
-          borderRadius: '12px',
-          boxShadow: '0 25px 50px rgba(0,0,0,0.7)',
-          border: '1px solid #30363d',
-        }}
-      >
-        {/* Terminal header */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-          <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#ff5f56' }} />
-          <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#ffbd2e' }} />
-          <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#27c93f' }} />
-        </div>
-
-        {/* Command prompt */}
-        <div style={{ fontFamily: 'monospace', fontSize: 32, color: '#c9d1d9' }}>
-          <span style={{ color: '#58a6ff' }}>$ </span>
-          {typedCommand}
-          {!enterPressed && <span style={{ opacity: cursorOpacity }}>▊</span>}
-        </div>
-
-        {/* Report output */}
-        {enterPressed && (
-          <div
-            style={{
-              marginTop: '30px',
-              opacity: reportOpacity,
-              transform: `scale(${enterScale})`,
-            }}
-          >
-            {/* Show uploaded screenshot of report */}
-            <img
-              src={staticFile('uploaded_image_1769009680488.png')}
-              style={{
-                width: '100%',
-                maxHeight: '400px',
-                objectFit: 'contain',
-                borderRadius: '6px',
-              }}
-            />
+      {/* Terminal window - hide when result shows */}
+      {!enterPressed && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '10%',
+            left: '10%',
+            right: '10%',
+            padding: '30px',
+            backgroundColor: '#161b22',
+            borderRadius: '12px',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.7)',
+            border: '1px solid #30363d',
+          }}
+        >
+          {/* Terminal header */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+            <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#ff5f56' }} />
+            <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#ffbd2e' }} />
+            <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#27c93f' }} />
           </div>
-        )}
-      </div>
+
+          {/* Command prompt */}
+          <div style={{ fontFamily: 'monospace', fontSize: 32, color: '#c9d1d9' }}>
+            <span style={{ color: '#58a6ff' }}>$ </span>
+            {typedCommand}
+            <span style={{ opacity: cursorOpacity }}>▊</span>
+          </div>
+        </div>
+      )}
+
+      {/* Full screen result */}
+      {enterPressed && (
+        <AbsoluteFill
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '60px',
+            opacity: reportOpacity,
+          }}
+        >
+          <img
+            src={staticFile('new-result.png')}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+            }}
+          />
+        </AbsoluteFill>
+      )}
 
       {/* "Report ready" text overlay */}
       <AbsoluteFill
