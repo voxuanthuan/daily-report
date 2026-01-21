@@ -5,7 +5,11 @@
 
 A CLI tool for daily Jira reporting and Tempo time logging from your terminal.
 
-https://github-production-user-asset-6210df.s3.amazonaws.com/32610071/538649389-b7bd22be-3330-4f28-9575-a8fe42abc357.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20260121%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260121T155916Z&X-Amz-Expires=300&X-Amz-Signature=bb2178a602fd99112356aee9745b0560f1e14a667ec994e6e52bd25f2d98e30d&X-Amz-SignedHeaders=host
+## 🎬 Demo Video
+
+[![Watch Demo](https://raw.githubusercontent.com/voxuanthuan/daily-report/main/images/video-thumbnail.png)](https://github-production-user-asset-6210df.s3.amazonaws.com/32610071/538649389-b7bd22be-3330-4f28-9575-a8fe42abc357.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20260121%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260121T155916Z&X-Amz-Expires=300&X-Amz-Signature=bb2178a602fd99112356aee9745b0560f1e14a667ec994e6e52bd25f2d98e30d&X-Amz-SignedHeaders=host)
+
+*Click to watch the demo video*
 
 
 ## Installation
