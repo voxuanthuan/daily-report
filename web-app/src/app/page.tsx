@@ -15,15 +15,6 @@ export default function Home() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [copied, setCopied] = useState(false);
 
-  const { data: user } = useQuery({
-      queryKey: ["myself"],
-      queryFn: async () => {
-          const res = await fetch("/api/jira/myself");
-          if (!res.ok) return null;
-          return res.json();
-      }
-  });
-
   const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
     queryKey: ["report", date],
     queryFn: async () => {
@@ -129,9 +120,7 @@ export default function Home() {
             <div className="flex items-center gap-3">
                 {/* Back button removed as this is now Home */}
                 <div>
-                    <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-                        {user?.displayName ? `Hi, ${user.displayName}` : "Daily Report"}
-                    </h1>
+                    <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Daily Report</h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Generate markdown for your standup</p>
                 </div>
             </div>
