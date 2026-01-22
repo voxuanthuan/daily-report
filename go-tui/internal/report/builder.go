@@ -65,13 +65,6 @@ func BuildMainReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDa
 
 	sb.WriteString("No blockers\n")
 
-	if len(stories) > 0 {
-		sb.WriteString("\nIn-Progress (Story)\n")
-		for _, s := range stories {
-			sb.WriteString(fmt.Sprintf("● %s: %s\n", s.Key, s.Fields.Summary))
-		}
-	}
-
 	return sb.String()
 }
 
