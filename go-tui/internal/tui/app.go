@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yourusername/jira-daily-report/internal/api"
+	"github.com/yourusername/jira-daily-report/internal/cache"
 	"github.com/yourusername/jira-daily-report/internal/config"
 	"github.com/yourusername/jira-daily-report/internal/jira"
 	"github.com/yourusername/jira-daily-report/internal/model"
@@ -31,12 +32,15 @@ type Model struct {
 	jiraClient         *api.JiraClient
 	tempoClient        *api.TempoClient
 	config             *config.Manager
+	cacheManager       *cache.Manager
 	logTimeModal       *LogTimeModal
 	copyOptionsModal   *CopyOptionsModal
 	reportPreviewModal *ReportPreviewModal
 	statusModal        *StatusDialogModel
 	lastKey            string
 	spinner            spinner.Model
+	cacheAge           time.Duration
+	fromCache          bool
 }
 
 type transitionsFetchedMsg struct {
@@ -44,6 +48,13 @@ type transitionsFetchedMsg struct {
 	issueKey    string
 	status      string
 }
+
+type cacheLoadedMsg struct {
+	data *cache.CacheData
+	err  error
+}
+
+type cacheSaveMsg struct{}
 
 // NewModel creates a new TUI model
 func NewModel(cfg *config.Manager) *Model {
@@ -58,6 +69,11 @@ func NewModel(cfg *config.Manager) *Model {
 		jiraClient,
 	)
 
+	cacheManager, err := cache.NewManager(cfg.GetCacheEnabled(), cfg.GetCacheTTL())
+	if err != nil {
+		cacheManager = nil
+	}
+
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -70,7 +86,9 @@ func NewModel(cfg *config.Manager) *Model {
 		jiraClient:     jiraClient,
 		tempoClient:    tempoClient,
 		config:         cfg,
+		cacheManager:   cacheManager,
 		spinner:        s,
+		fromCache:      false,
 	}
 }
 
@@ -87,10 +105,19 @@ type delayedRefreshMsg struct{}
 // Init initializes the model
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
-		m.loadTasksCmd,
+		m.loadCachedDataCmd,
 		tea.EnterAltScreen,
 		m.spinner.Tick,
 	)
+}
+
+func (m *Model) loadCachedDataCmd() tea.Msg {
+	if m.cacheManager == nil {
+		return cacheLoadedMsg{err: fmt.Errorf("cache manager not initialized")}
+	}
+
+	data, err := m.cacheManager.Load()
+	return cacheLoadedMsg{data: data, err: err}
 }
 
 // tasksLoadedMsg is sent when tasks are loaded (fast path)
@@ -295,26 +322,42 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		action := actions.NewChangeStatusAction(msg.targetStatus, msg.transitionID)
 		return m, m.actionExecutor.ExecuteAction(action, ctx)
 
+	case cacheLoadedMsg:
+		if msg.err == nil && msg.data != nil {
+			m.state.User = msg.data.User
+			m.state.ReportTasks = msg.data.ReportTasks
+			m.state.TodoTasks = msg.data.TodoTasks
+			m.state.ProcessingTasks = msg.data.ProcessingTasks
+			m.state.Worklogs = msg.data.Worklogs
+			m.state.DateGroups = msg.data.DateGroups
+			m.state.Loading = false
+			m.fromCache = true
+			m.cacheAge = msg.data.Age()
+			m.state.StatusMessage = fmt.Sprintf("📦 Loaded from cache (%v ago), refreshing...",
+				formatDuration(m.cacheAge))
+			return m, m.loadTasksCmd
+		}
+		m.state.StatusMessage = "Loading fresh data..."
+		return m, m.loadTasksCmd
+
 	case tasksLoadedMsg:
-		// Phase 1 complete: Tasks loaded, show them immediately
 		m.state.User = msg.user
 		m.state.ReportTasks = msg.reportTasks
 		m.state.TodoTasks = msg.todoTasks
 		m.state.ProcessingTasks = msg.processingTasks
 		m.state.Loading = false
 		m.state.WorklogsLoading = true
+		m.fromCache = false
 		m.state.StatusMessage = fmt.Sprintf("Loaded %d tasks. Loading time data...",
 			len(msg.reportTasks)+len(msg.todoTasks)+len(msg.processingTasks))
-		// Chain Phase 2: Load worklogs in background (with small delay to let UI update)
-		// Use tea.Tick to schedule Phase 2 after UI renders
 		return m, tea.Batch(
 			tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
 				return startPhase2Msg{}
 			}),
+			func() tea.Msg { return cacheSaveMsg{} },
 		)
 
 	case worklogsLoadedMsg:
-		// Phase 2 complete: Worklogs loaded
 		m.state.WorklogsLoading = false
 		if msg.err != nil {
 			m.state.StatusMessage = fmt.Sprintf("Tasks ready. Worklog error: %v", msg.err)
@@ -325,7 +368,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state.StatusMessage = fmt.Sprintf("Loaded %d tasks, %d worklogs",
 			len(m.state.ReportTasks)+len(m.state.TodoTasks)+len(m.state.ProcessingTasks),
 			len(msg.worklogs))
-		return m, nil
+		return m, func() tea.Msg { return cacheSaveMsg{} }
 
 	case startPhase2Msg:
 		// Triggered after UI has had time to render Phase 1 results
@@ -501,9 +544,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case refresh.RefreshVerifiedMsg:
 		m.state.CurrentAction = nil
 		m.state.StatusMessage = fmt.Sprintf("✓ %s verified", msg.ActionName)
-		// Trigger full refresh to update UI state with confirmed data
 		m.state.Loading = true
-		return m, m.loadTasksCmd
+		return m, tea.Batch(
+			m.loadTasksCmd,
+			func() tea.Msg { return cacheSaveMsg{} },
+		)
 
 	case refresh.RefreshTimeoutMsg:
 		m.state.CurrentAction = nil
@@ -530,10 +575,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Rollback optimistic updates if snapshot exists
 		// TODO: Implement state snapshots
 		m.state.StateSnapshot = nil
-		// Show error message
 		m.state.StatusMessage = fmt.Sprintf("Error: %v", msg.Error)
 		m.state.CurrentAction = nil
 		return m, nil
+
+	case cacheSaveMsg:
+		return m, m.saveCacheCmd
 	}
 
 	return m, nil
@@ -1292,12 +1339,16 @@ func (m Model) renderDetailsPanelWithSize(width, height int) string {
 func (m Model) renderStatusBar() string {
 	helpText := "q: quit | j/k: move | 1/2/3/0: panels | o: open | c: copy report | yy: copy task | r: refresh | i: log time | H: history"
 
-	// Add loading spinner if active (without text)
+	if m.fromCache && m.cacheAge > 0 {
+		cacheIndicator := fmt.Sprintf(" [📦 %s old]", formatDuration(m.cacheAge))
+		helpText = cacheIndicator + " | " + helpText
+	}
+
 	if m.state.Loading || m.activePoller != nil {
 		helpText = m.spinner.View() + " " + helpText
 	}
 
-	maxWidth := m.width - 2 // Padding
+	maxWidth := m.width - 2
 
 	if maxWidth <= 0 {
 		return ""
@@ -1414,4 +1465,32 @@ func groupWorklogsByDate(worklogs []model.Worklog) []model.DateGroup {
 	})
 
 	return groups
+}
+
+func (m *Model) saveCacheCmd() tea.Msg {
+	if m.cacheManager == nil {
+		return nil
+	}
+
+	cacheData := cache.BuildCacheData(
+		m.state.User,
+		m.state.ReportTasks,
+		m.state.TodoTasks,
+		m.state.ProcessingTasks,
+		m.state.Worklogs,
+		m.state.DateGroups,
+	)
+
+	_ = m.cacheManager.Save(cacheData)
+	return nil
+}
+
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	return fmt.Sprintf("%dh", int(d.Hours()))
 }

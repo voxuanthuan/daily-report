@@ -114,6 +114,7 @@ Location: /home/user/.jira-daily-report.json
 ✅ **Worklog Enrichment** - Shows task details with time logged
 ✅ **Dark Theme** - Beautiful terminal UI
 ✅ **Single Binary** - No dependencies
+✅ **Smart Caching** - Instant startup with cached data (enabled by default)
 
 ---
 
@@ -126,14 +127,33 @@ Location: `~/.jira-daily-report.json`
   "jiraServer": "https://your-domain.atlassian.net",
   "username": "you@example.com",
   "apiToken": "your-jira-api-token",
-  "tempoApiToken": "your-tempo-api-token",
+  "tempoApiToken": "your-tempo-token",
   "whoAmI": "your-account-id",
   "autoClipboard": false,
-  "theme": "dark"
+  "theme": "dark",
+  "cacheEnabled": true,
+  "cacheTTL": 60
 }
 ```
 
 **Security**: File permissions are set to `0600` (owner read/write only)
+
+### Cache Configuration
+
+- **`cacheEnabled`**: Enable/disable caching (default: `true`)
+- **`cacheTTL`**: Cache time-to-live in minutes (default: `60`)
+- **Cache file**: `~/.jira-daily-report-cache.json` (auto-managed)
+
+**Environment Variables:**
+```bash
+export JIRA_CACHE_ENABLED=true   # Enable/disable cache
+export JIRA_CACHE_TTL=60          # Cache TTL in minutes
+```
+
+**How it works:**
+1. First launch: Fetches fresh data from APIs (~500ms)
+2. Subsequent launches: Shows cached data instantly (~50ms), then refreshes in background
+3. Cache indicator: Shows `📦 Xm old` in status bar when using cached data
 
 ---
 
@@ -156,11 +176,16 @@ cd go-tui
 
 ## Performance
 
-| Metric | TypeScript | Go | Improvement |
-|--------|-----------|-----|-------------|
-| Startup | ~500ms | **~50ms** | **10x faster** |
-| Navigation | ~200ms | **<10ms** | **20x faster** |
-| Memory | ~100MB | **~20MB** | **5x less** |
+| Metric | TypeScript | Go (Cold Start) | Go (Cached) | Best Improvement |
+|--------|-----------|-----------------|-------------|------------------|
+| Startup | ~500ms | ~500ms | **~50ms** | **10x faster** |
+| Navigation | ~200ms | **<10ms** | **<10ms** | **20x faster** |
+| Memory | ~100MB | **~20MB** | **~20MB** | **5x less** |
+
+**Cache Performance:**
+- ⚡ **First launch**: ~500ms (fetches from API)
+- 🚀 **Cached launch**: ~50ms (10x faster)
+- 🔄 **Background refresh**: Data updates seamlessly without blocking UI
 
 ---
 

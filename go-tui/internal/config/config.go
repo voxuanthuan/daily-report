@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 )
 
 // Config holds the application configuration
@@ -16,6 +18,8 @@ type Config struct {
 	WhoAmI        string `json:"whoAmI"`
 	AutoClipboard bool   `json:"autoClipboard"`
 	Theme         string `json:"theme"`
+	CacheEnabled  bool   `json:"cacheEnabled"`
+	CacheTTL      int    `json:"cacheTTL"`
 }
 
 // Manager handles configuration loading and access
@@ -73,6 +77,20 @@ func loadConfig() (*Config, error) {
 	}
 	if val := os.Getenv("JIRA_THEME"); val != "" {
 		config.Theme = val
+	}
+	if val := os.Getenv("JIRA_CACHE_ENABLED"); val != "" {
+		config.CacheEnabled = val == "true" || val == "1"
+	} else if config.CacheEnabled == false && val == "" {
+		config.CacheEnabled = true
+	}
+	if val := os.Getenv("JIRA_CACHE_TTL"); val != "" {
+		if ttl, err := strconv.Atoi(val); err == nil {
+			config.CacheTTL = ttl
+		}
+	}
+
+	if config.CacheTTL == 0 {
+		config.CacheTTL = 60
 	}
 
 	// Validate required fields
@@ -138,4 +156,14 @@ func (m *Manager) GetAutoClipboard() bool {
 // GetConfig returns the underlying configuration
 func (m *Manager) GetConfig() *Config {
 	return m.config
+}
+
+// GetCacheEnabled returns whether caching is enabled
+func (m *Manager) GetCacheEnabled() bool {
+	return m.config.CacheEnabled
+}
+
+// GetCacheTTL returns the cache TTL duration
+func (m *Manager) GetCacheTTL() time.Duration {
+	return time.Duration(m.config.CacheTTL) * time.Minute
 }
