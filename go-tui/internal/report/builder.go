@@ -26,12 +26,12 @@ func BuildMainReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDa
 	sb.WriteString("Hi everyone,\n")
 	sb.WriteString(label + "\n")
 
-	uniquePrev := deduplicateWorklogs(prevTasks)
-	if len(uniquePrev) > 0 {
-		for _, w := range uniquePrev {
-			sb.WriteString(fmt.Sprintf("● %s: %s\n", w.Issue.Key, w.Issue.Summary))
-			if w.Description != "" {
-				sb.WriteString(fmt.Sprintf("  ○ %s\n", w.Description))
+	aggregatedPrev := aggregateWorklogs(prevTasks)
+	if len(aggregatedPrev) > 0 {
+		for _, item := range aggregatedPrev {
+			sb.WriteString(fmt.Sprintf("● %s: %s\n", item.Issue.Key, item.Issue.Summary))
+			for _, desc := range item.Descriptions {
+				sb.WriteString(fmt.Sprintf("  ○ %s\n", desc))
 			}
 		}
 	} else {
@@ -66,6 +66,50 @@ func BuildMainReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDa
 	sb.WriteString("No blockers\n")
 
 	return sb.String()
+}
+
+type AggregatedWorklog struct {
+	Issue        model.WorklogIssue
+	Descriptions []string
+}
+
+func aggregateWorklogs(worklogs []model.Worklog) []AggregatedWorklog {
+	// Group by Issue Key
+	grouped := make(map[string]*AggregatedWorklog)
+	var result []AggregatedWorklog
+	var order []string // To maintain order of appearance
+
+	for _, w := range worklogs {
+		if _, exists := grouped[w.Issue.Key]; !exists {
+			grouped[w.Issue.Key] = &AggregatedWorklog{
+				Issue:        w.Issue,
+				Descriptions: []string{},
+			}
+			order = append(order, w.Issue.Key)
+		}
+
+		desc := strings.TrimSpace(w.Description)
+		// Filter out empty descriptions and default "Working on issue" descriptions
+		if desc != "" && !strings.HasPrefix(desc, "Working on issue ") {
+			// Check for duplicates within this issue's descriptions
+			isDuplicate := false
+			for _, d := range grouped[w.Issue.Key].Descriptions {
+				if d == desc {
+					isDuplicate = true
+					break
+				}
+			}
+			if !isDuplicate {
+				grouped[w.Issue.Key].Descriptions = append(grouped[w.Issue.Key].Descriptions, desc)
+			}
+		}
+	}
+
+	for _, key := range order {
+		result = append(result, *grouped[key])
+	}
+
+	return result
 }
 
 // BuildTodoList builds the Todo section
