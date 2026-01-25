@@ -55,12 +55,35 @@ func writeHTMLMacOS(html string) error {
 }
 
 func writeHTMLLinux(html string) error {
-	// Linux: xclip -selection clipboard -t text/html
-	// Check if xclip is installed
-	if _, err := exec.LookPath("xclip"); err != nil {
-		return fmt.Errorf("xclip is required for HTML clipboard on Linux. Please install it (e.g., sudo apt install xclip)")
+	// Try wl-copy (Wayland) first
+	if _, err := exec.LookPath("wl-copy"); err == nil {
+		return writeHTMLWayland(html)
 	}
 
+	// Fallback to xclip (X11)
+	if _, err := exec.LookPath("xclip"); err == nil {
+		return writeHTMLXClip(html)
+	}
+
+	return fmt.Errorf("no suitable clipboard tool found. Please install 'wl-clipboard' (Wayland) or 'xclip' (X11)")
+}
+
+func writeHTMLWayland(html string) error {
+	// Use wl-copy to set both text/html and text/plain (as fallback)
+	// Note: wl-copy uses the same input for all types, so text/plain will get the HTML source.
+	cmd := exec.Command("wl-copy", "--type", "text/html", "--type", "text/plain")
+	cmd.Stdin = strings.NewReader(html)
+
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("wl-copy failed: %s: %w", string(output), err)
+	}
+	return nil
+}
+
+func writeHTMLXClip(html string) error {
+	// Linux: xclip -selection clipboard -t text/html
+	// Note: xclip doesn't support multiple targets well (last one wins),
+	// so we only set text/html. For plain text, users should use 'c' key.
 	cmd := exec.Command("xclip", "-selection", "clipboard", "-t", "text/html")
 	cmd.Stdin = strings.NewReader(html)
 

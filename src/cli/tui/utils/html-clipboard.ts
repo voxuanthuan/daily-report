@@ -28,11 +28,51 @@ export class HtmlClipboard {
         args = ['-NoProfile', '-Command', `Set-Clipboard -AsHtml "${escapedHtml}"`];
         useStdin = false;
       } else {
-        // Linux: Default to xclip
-        // We could add logic to detect Wayland (wl-copy) vs X11
-        // For now, try xclip which is common
-        command = 'xclip';
-        args = ['-selection', 'clipboard', '-t', 'text/html'];
+        // Linux: Try wl-copy (Wayland) then xclip (X11)
+        const tryWlCopy = () => {
+          const wlArgs = ['--type', 'text/html', '--type', 'text/plain'];
+          const wlChild = spawn('wl-copy', wlArgs);
+
+          wlChild.on('error', () => {
+             // wl-copy not found or failed to spawn, try xclip
+             tryXclip();
+          });
+
+          wlChild.on('close', (code) => {
+            if (code === 0) {
+              resolve();
+            } else {
+              // wl-copy failed (e.g. not Wayland), try xclip
+              tryXclip();
+            }
+          });
+
+          wlChild.stdin.write(input);
+          wlChild.stdin.end();
+        };
+
+        const tryXclip = () => {
+          const xcArgs = ['-selection', 'clipboard', '-t', 'text/html'];
+          const xcChild = spawn('xclip', xcArgs);
+
+          xcChild.on('error', (err) => {
+             reject(new Error(`Failed to execute clipboard command. Please install wl-clipboard (Wayland) or xclip (X11). Error: ${err.message}`));
+          });
+
+          xcChild.on('close', (code) => {
+            if (code === 0) {
+              resolve();
+            } else {
+              reject(new Error(`xclip failed (code ${code}). Ensure xclip is installed.`));
+            }
+          });
+
+          xcChild.stdin.write(input);
+          xcChild.stdin.end();
+        };
+
+        tryWlCopy();
+        return; // Return to avoid running the default spawn below
       }
 
       const child = spawn(command, args);

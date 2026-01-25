@@ -73,11 +73,16 @@ func (m *ReportPreviewModal) Update(msg tea.KeyMsg) (*ReportPreviewModal, tea.Cm
 
 	case "c":
 		// Copy report as Text
-		return m, m.copyReport(false)
+		return m, m.copyReport(false, false)
 
 	case "y":
 		// Copy report as HTML
-		return m, m.copyReport(true)
+		return m, m.copyReport(true, false)
+
+	case "Y":
+		// Copy HTML source as text
+		return m, m.copyReport(true, true)
+
 
 	case "g":
 		// Go to top
@@ -94,13 +99,22 @@ func (m *ReportPreviewModal) Update(msg tea.KeyMsg) (*ReportPreviewModal, tea.Cm
 }
 
 // copyReport copies the report content to clipboard
-func (m *ReportPreviewModal) copyReport(html bool) tea.Cmd {
+func (m *ReportPreviewModal) copyReport(html bool, source bool) tea.Cmd {
 	return func() tea.Msg {
 		if html {
+			if source {
+				// Copy HTML source as plain text
+				if err := clipboard.WriteAll(m.htmlContent); err != nil {
+					return errMsg{fmt.Errorf("failed to copy HTML source: %w", err)}
+				}
+				return reportCopiedMsg{message: "HTML source copied to clipboard!"}
+			}
+
+			// Copy as Rich Text (HTML)
 			if err := htmlclipboard.WriteHTML(m.htmlContent); err != nil {
 				return errMsg{fmt.Errorf("failed to copy HTML report: %w", err)}
 			}
-			return reportCopiedMsg{message: "Report copied to clipboard (HTML)!"}
+			return reportCopiedMsg{message: "Report copied (Rich Text)!"}
 		}
 
 		if err := clipboard.WriteAll(m.content); err != nil {
@@ -176,7 +190,7 @@ func (m *ReportPreviewModal) View() string {
 
 	// Build the modal content
 	title := "📋 Daily Report Preview" + scrollIndicator
-	footer := "c: text | y: html | j/k: scroll | esc: close"
+	footer := "c: text | y: html | Y: source | j/k: scroll | esc: close"
 
 	// Style definitions
 	titleStyle := lipgloss.NewStyle().
