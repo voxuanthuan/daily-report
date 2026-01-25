@@ -168,7 +168,7 @@ func (gui *Gui) layout(g *gocui.Gui) error {
 			return err
 		}
 		v.Frame = false
-		fmt.Fprintf(v, gui.state.StatusMessage+" | q: quit | j/k: move | 1/2/3/0: panels | i: log time")
+		fmt.Fprintf(v, "%s | q: quit | j/k: move | 1/2/3/0: panels | i: log time", gui.state.StatusMessage)
 	}
 
 	// Set initial focus

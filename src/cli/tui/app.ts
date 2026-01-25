@@ -16,6 +16,7 @@ import { fetchAllTasks, fetchUserDisplayName, extractPreviousWorkdayTasks, clear
 import TempoFetcher from '../../core/tempo/fetcher';
 import { CacheManager, RequestDeduplicator, debounce } from './utils/cache';
 import { getTheme, setTheme, getCurrentThemeMode, onThemeChange, markThemeInitialized, ThemeMode } from './theme';
+import { ReportPreviewModal } from './modals/report-preview-modal';
 import { applyRoundedCorners } from './utils/rounded-corners';
 
 export class TUIApp {
@@ -814,12 +815,11 @@ export class TUIApp {
 
     const report = lines.join('\n');
 
-    try {
-      await this.copyToClipboard(report);
-      this.showToast('Report copied!', 'success', 2500);
-    } catch (error) {
-      this.showToast('Copy failed', 'error');
-    }
+    // Show preview modal
+    const modal = new ReportPreviewModal(this.screen, () => {
+      this.screen.render();
+    });
+    modal.show(report);
   }
 
   private async refreshTasks(): Promise<void> {

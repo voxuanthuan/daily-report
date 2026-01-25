@@ -10,12 +10,14 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yourusername/jira-daily-report/internal/model"
 	"github.com/yourusername/jira-daily-report/internal/report"
+	htmlclipboard "github.com/yourusername/jira-daily-report/internal/tui/clipboard"
 )
 
 // ReportPreviewModal shows a full-screen preview of the daily report
 type ReportPreviewModal struct {
 	active       bool
 	content      string
+	htmlContent  string
 	scrollOffset int
 	maxScroll    int
 	width        int
@@ -31,10 +33,12 @@ type reportCopiedMsg struct {
 func NewReportPreviewModal(worklogs []model.Worklog, inProgress []model.Issue, prevDate time.Time, width, height int) *ReportPreviewModal {
 	// Build the report content using the report builder
 	content := report.BuildMainReport(worklogs, inProgress, prevDate)
+	htmlContent := report.BuildHTMLReport(worklogs, inProgress, prevDate)
 
 	return &ReportPreviewModal{
 		active:       true,
 		content:      content,
+		htmlContent:  htmlContent,
 		scrollOffset: 0,
 		width:        width,
 		height:       height,
@@ -67,9 +71,13 @@ func (m *ReportPreviewModal) Update(msg tea.KeyMsg) (*ReportPreviewModal, tea.Cm
 		}
 		return m, nil
 
+	case "c":
+		// Copy report as Text
+		return m, m.copyReport(false)
+
 	case "y":
-		// Copy report to clipboard and close
-		return m, m.copyReport()
+		// Copy report as HTML
+		return m, m.copyReport(true)
 
 	case "g":
 		// Go to top
@@ -86,12 +94,19 @@ func (m *ReportPreviewModal) Update(msg tea.KeyMsg) (*ReportPreviewModal, tea.Cm
 }
 
 // copyReport copies the report content to clipboard
-func (m *ReportPreviewModal) copyReport() tea.Cmd {
+func (m *ReportPreviewModal) copyReport(html bool) tea.Cmd {
 	return func() tea.Msg {
+		if html {
+			if err := htmlclipboard.WriteHTML(m.htmlContent); err != nil {
+				return errMsg{fmt.Errorf("failed to copy HTML report: %w", err)}
+			}
+			return reportCopiedMsg{message: "Report copied to clipboard (HTML)!"}
+		}
+
 		if err := clipboard.WriteAll(m.content); err != nil {
 			return errMsg{fmt.Errorf("failed to copy report: %w", err)}
 		}
-		return reportCopiedMsg{message: "Report copied to clipboard!"}
+		return reportCopiedMsg{message: "Report copied to clipboard (Text)!"}
 	}
 }
 
@@ -161,7 +176,7 @@ func (m *ReportPreviewModal) View() string {
 
 	// Build the modal content
 	title := "📋 Daily Report Preview" + scrollIndicator
-	footer := "y: copy | j/k: scroll | g/G: top/bottom | esc: close"
+	footer := "c: text | y: html | j/k: scroll | esc: close"
 
 	// Style definitions
 	titleStyle := lipgloss.NewStyle().

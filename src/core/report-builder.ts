@@ -143,3 +143,75 @@ export function buildTodoList(openTasks: any[], inProgress: any[] = []): string 
 export function combineReport(mainReport: string, timeLog: string, inProgressStories: string, todoList: string, worklogs: string): string {
   return `${mainReport}${timeLog}${inProgressStories}${todoList}${worklogs}`;
 }
+
+export function buildHtmlReport(text: string): string {
+  const lines = text.split('\n');
+  let html = '';
+  let listLevel = 0; // 0: none, 1: ul, 2: nested ul
+
+  // Helper to close lists down to a specific level
+  const closeListsToLevel = (targetLevel: number) => {
+    while (listLevel > targetLevel) {
+      if (listLevel === 2) {
+        html += '    </ul>\n  </li>\n';
+      } else if (listLevel === 1) {
+        html += '</ul>\n';
+      }
+      listLevel--;
+    }
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Check for bullet points
+    // Level 1: "  - " (2 spaces)
+    // Level 2: "    - " (4 spaces)
+    const isLevel1 = line.startsWith('  - ');
+    const isLevel2 = line.startsWith('    - ');
+
+    if (isLevel2) {
+      if (listLevel < 2) {
+         // If we are at level 1, start a nested list inside the previous li
+         if (listLevel === 0) {
+           html += '<ul>\n';
+           listLevel = 1;
+         }
+         if (listLevel === 1) {
+            html += '    <ul>\n';
+            listLevel = 2;
+         }
+      }
+      const content = line.replace(/^\s+-\s+/, '');
+      html += `      <li>${escapeHtml(content)}</li>\n`;
+
+    } else if (isLevel1) {
+      closeListsToLevel(1); // Close any level 2
+      if (listLevel === 0) {
+        html += '<ul>\n';
+        listLevel = 1;
+      }
+      const content = line.replace(/^\s+-\s+/, '');
+      html += `  <li>${escapeHtml(content)}</li>\n`;
+    } else {
+      // Not a list item
+      closeListsToLevel(0);
+      if (trimmed) {
+        // Paragraph or Header
+        html += `<p>${escapeHtml(trimmed)}</p>\n`;
+      }
+    }
+  }
+
+  closeListsToLevel(0);
+  return html;
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}

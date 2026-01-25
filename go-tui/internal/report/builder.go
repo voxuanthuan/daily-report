@@ -65,6 +65,89 @@ func BuildMainReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDa
 
 	sb.WriteString("No blockers\n")
 
+	if len(stories) > 0 {
+		sb.WriteString("\n.\n\nIn-Progress (Story)\n")
+		for _, s := range stories {
+			sb.WriteString(fmt.Sprintf("● %s: %s\n", s.Key, s.Fields.Summary))
+		}
+	}
+
+	return sb.String()
+}
+
+func BuildHTMLReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDate time.Time) string {
+	var sb strings.Builder
+
+	label := "Yesterday"
+	if !prevDate.IsZero() {
+		today := time.Now()
+		daysDiff := int(today.Sub(prevDate).Hours() / 24)
+
+		if daysDiff > 1 {
+			weekday := prevDate.Weekday().String()
+			label = fmt.Sprintf("Last %s", weekday)
+		}
+	}
+
+	sb.WriteString("<p>Hi everyone,</p>\n")
+	sb.WriteString(fmt.Sprintf("<p>%s</p>\n", label))
+	sb.WriteString("<ul>\n")
+
+	aggregatedPrev := aggregateWorklogs(prevTasks)
+	if len(aggregatedPrev) > 0 {
+		for _, item := range aggregatedPrev {
+			sb.WriteString(fmt.Sprintf("<li>%s: %s", item.Issue.Key, item.Issue.Summary))
+			if len(item.Descriptions) > 0 {
+				sb.WriteString("\n<ul>\n")
+				for _, desc := range item.Descriptions {
+					sb.WriteString(fmt.Sprintf("<li>%s</li>\n", desc))
+				}
+				sb.WriteString("</ul>\n")
+			}
+			sb.WriteString("</li>\n")
+		}
+	} else {
+		sb.WriteString("<li>No tasks logged.</li>\n")
+	}
+	sb.WriteString("</ul>\n")
+
+	sb.WriteString("<p>Today</p>\n")
+	sb.WriteString("<ul>\n")
+
+	uniqueInProgress := deduplicateIssues(inProgress)
+
+	var stories []model.Issue
+	var tasks []model.Issue
+
+	for _, issue := range uniqueInProgress {
+		isStory := strings.EqualFold(issue.Fields.IssueType.Name, "Story") ||
+			strings.EqualFold(issue.Fields.IssueType.Name, "Epic")
+		if isStory {
+			stories = append(stories, issue)
+		} else {
+			tasks = append(tasks, issue)
+		}
+	}
+
+	if len(tasks) > 0 {
+		for _, t := range tasks {
+			sb.WriteString(fmt.Sprintf("<li>%s: %s</li>\n", t.Key, t.Fields.Summary))
+		}
+	} else {
+		sb.WriteString("<li>No tasks planned.</li>\n")
+	}
+	sb.WriteString("</ul>\n")
+
+	sb.WriteString("<p>No blockers</p>\n")
+
+	if len(stories) > 0 {
+		sb.WriteString("<p>.</p>\n<p>In-Progress (Story)</p>\n<ul>\n")
+		for _, s := range stories {
+			sb.WriteString(fmt.Sprintf("<li>%s: %s</li>\n", s.Key, s.Fields.Summary))
+		}
+		sb.WriteString("</ul>\n")
+	}
+
 	return sb.String()
 }
 
