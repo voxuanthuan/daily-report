@@ -119,6 +119,28 @@ Location: /home/user/.jira-daily-report.json
 
 ---
 
+## Image Previews
+
+The TUI supports inline image previews for Jira issue descriptions.
+
+### Supported Terminals (Native High-Res)
+If you use a terminal with **Sixel**, **Kitty**, or **iTerm2** protocol support, images will render natively in high resolution.
+- **iTerm2** (macOS)
+- **Kitty**
+- **WezTerm**
+- **Alacritty** (with sixel patch) or others
+
+### Standard Terminals (Fallback)
+For standard terminals (VSCode integrated terminal, Apple Terminal, GNOME Terminal), install **`viu`** to enable block-based image previews.
+
+**Installation:**
+- **macOS**: `brew install viu`
+- **Linux**: `cargo install viu` (or check your package manager)
+
+If `viu` is detected, the TUI will automatically use it as a fallback renderer. Without it, you will see a text placeholder.
+
+---
+
 ## Configuration File
 
 Location: `~/.jira-daily-report.json`
