@@ -3,9 +3,216 @@ package tui
 import (
 	"fmt"
 	"strings"
+
+	"github.com/yourusername/jira-daily-report/internal/model"
 )
 
-// parseDescription converts Jira description (ADF or plain text) to display lines
+type ContentType int
+
+const (
+	ContentTypeText ContentType = iota
+	ContentTypeImage
+)
+
+type DescriptionContent struct {
+	Type      ContentType
+	Text      string
+	ImageInfo *ImageInfo
+}
+
+func parseDescriptionWithImages(desc interface{}, maxWidth int, jiraServer string, attachments []model.Attachment) []DescriptionContent {
+	if desc == nil {
+		return []DescriptionContent{{Type: ContentTypeText, Text: "[No description]"}}
+	}
+
+	if descMap, ok := desc.(map[string]interface{}); ok {
+		return parseADFWithImages(descMap, maxWidth, jiraServer, attachments)
+	}
+
+	if descStr, ok := desc.(string); ok {
+		if strings.TrimSpace(descStr) == "" {
+			return []DescriptionContent{{Type: ContentTypeText, Text: "[No description]"}}
+		}
+		lines := wrapText(descStr, maxWidth)
+		result := make([]DescriptionContent, len(lines))
+		for i, line := range lines {
+			result[i] = DescriptionContent{Type: ContentTypeText, Text: line}
+		}
+		return result
+	}
+
+	return []DescriptionContent{{Type: ContentTypeText, Text: "[No description]"}}
+}
+
+func parseADFWithImages(adf map[string]interface{}, maxWidth int, jiraServer string, attachments []model.Attachment) []DescriptionContent {
+	result := []DescriptionContent{}
+
+	content, ok := adf["content"].([]interface{})
+	if !ok {
+		return []DescriptionContent{{Type: ContentTypeText, Text: "[No description]"}}
+	}
+
+	for _, node := range content {
+		nodeMap, ok := node.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		nodeType, _ := nodeMap["type"].(string)
+
+		switch nodeType {
+		case "paragraph":
+			lines := parseParagraph(nodeMap, maxWidth)
+			for _, line := range lines {
+				result = append(result, DescriptionContent{Type: ContentTypeText, Text: line})
+			}
+		case "heading":
+			lines := parseHeading(nodeMap, maxWidth)
+			for _, line := range lines {
+				result = append(result, DescriptionContent{Type: ContentTypeText, Text: line})
+			}
+		case "bulletList":
+			lines := parseBulletList(nodeMap, maxWidth)
+			for _, line := range lines {
+				result = append(result, DescriptionContent{Type: ContentTypeText, Text: line})
+			}
+		case "orderedList":
+			lines := parseOrderedList(nodeMap, maxWidth)
+			for _, line := range lines {
+				result = append(result, DescriptionContent{Type: ContentTypeText, Text: line})
+			}
+		case "codeBlock":
+			lines := parseCodeBlock(nodeMap, maxWidth)
+			for _, line := range lines {
+				result = append(result, DescriptionContent{Type: ContentTypeText, Text: line})
+			}
+		case "mediaGroup", "mediaSingle":
+			images := parseMediaWithImages(nodeMap, jiraServer, attachments)
+			result = append(result, images...)
+		case "rule":
+			result = append(result, DescriptionContent{Type: ContentTypeText, Text: strings.Repeat("─", min(maxWidth, 40))})
+		}
+
+		result = append(result, DescriptionContent{Type: ContentTypeText, Text: ""})
+	}
+
+	if len(result) == 0 {
+		return []DescriptionContent{{Type: ContentTypeText, Text: "[No description]"}}
+	}
+
+	return result
+}
+
+func parseMediaWithImages(node map[string]interface{}, jiraServer string, attachments []model.Attachment) []DescriptionContent {
+	result := []DescriptionContent{}
+
+	content, ok := node["content"].([]interface{})
+	if !ok {
+		return []DescriptionContent{{Type: ContentTypeText, Text: "[Image: no description]"}}
+	}
+
+	if imageDebugLog != nil {
+		imageDebugLog.Printf("[PARSER] parseMediaWithImages called with %d attachments", len(attachments))
+		for i, att := range attachments {
+			imageDebugLog.Printf("[PARSER]   Attachment[%d]: ID=%s, Filename=%s, ContentURL=%s", i, att.ID, att.Filename, att.Content)
+		}
+	}
+
+	for _, mediaNode := range content {
+		mediaMap, ok := mediaNode.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		if attrs, ok := mediaMap["attrs"].(map[string]interface{}); ok {
+			mediaID, _ := attrs["id"].(string)
+			filename, _ := attrs["__fileName"].(string)
+			alt, _ := attrs["alt"].(string)
+
+			if imageDebugLog != nil {
+				imageDebugLog.Printf("[PARSER] Processing media node: mediaID=%s, filename=%s", mediaID, filename)
+			}
+
+			if mediaID != "" {
+				var contentURL string
+
+				for _, att := range attachments {
+					if imageDebugLog != nil {
+						imageDebugLog.Printf("[PARSER]   Comparing mediaID=%s with attachmentID=%s", mediaID, att.ID)
+					}
+					if att.ID == mediaID {
+						contentURL = att.Content
+						if filename == "" {
+							filename = att.Filename
+						}
+						if imageDebugLog != nil {
+							imageDebugLog.Printf("[PARSER]   ✓ MATCH by ID! Using contentURL: %s", contentURL)
+						}
+						break
+					}
+				}
+
+				if contentURL == "" && alt != "" {
+					if imageDebugLog != nil {
+						imageDebugLog.Printf("[PARSER]   No ID match, trying filename match with alt=%s", alt)
+					}
+					for _, att := range attachments {
+						if imageDebugLog != nil {
+							imageDebugLog.Printf("[PARSER]   Comparing alt=%s with filename=%s", alt, att.Filename)
+						}
+						if att.Filename == alt {
+							contentURL = att.Content
+							if filename == "" {
+								filename = att.Filename
+							}
+							if imageDebugLog != nil {
+								imageDebugLog.Printf("[PARSER]   ✓ MATCH by filename! Using contentURL: %s", contentURL)
+							}
+							break
+						}
+					}
+				}
+
+				if contentURL == "" {
+					if imageDebugLog != nil {
+						imageDebugLog.Printf("[PARSER]   ✗ NO MATCH for mediaID=%s (tried ID and filename), showing placeholder", mediaID)
+					}
+					result = append(result, DescriptionContent{
+						Type: ContentTypeText,
+						Text: fmt.Sprintf("[Image: %s (not found in attachments)]", alt),
+					})
+					continue
+				}
+
+				if filename == "" {
+					filename = "image"
+				}
+
+				result = append(result, DescriptionContent{
+					Type: ContentTypeImage,
+					ImageInfo: &ImageInfo{
+						ID:       mediaID,
+						URL:      contentURL,
+						Filename: filename,
+						Alt:      alt,
+					},
+				})
+			} else if filename != "" {
+				result = append(result, DescriptionContent{
+					Type: ContentTypeText,
+					Text: fmt.Sprintf("[Image: %s]", filename),
+				})
+			}
+		}
+	}
+
+	if len(result) == 0 {
+		return []DescriptionContent{{Type: ContentTypeText, Text: "[Image: no description]"}}
+	}
+
+	return result
+}
+
 func parseDescription(desc interface{}, maxWidth int) []string {
 	if desc == nil {
 		return []string{"[No description]"}
@@ -326,4 +533,8 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func ParseDescriptionWithImagesExported(desc interface{}, maxWidth int, jiraServer string, attachments []model.Attachment) []DescriptionContent {
+	return parseDescriptionWithImages(desc, maxWidth, jiraServer, attachments)
 }

@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +21,15 @@ import (
 	"github.com/yourusername/jira-daily-report/internal/tui/state"
 )
 
+var debugLog *log.Logger
+
+func init() {
+	f, err := os.OpenFile("/tmp/jira-image-debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err == nil {
+		debugLog = log.New(f, "[APP] ", log.LstdFlags|log.Lshortfile)
+	}
+}
+
 // Model represents the Bubbletea application model
 type Model struct {
 	state              *state.State
@@ -33,6 +44,7 @@ type Model struct {
 	tempoClient        *api.TempoClient
 	config             *config.Manager
 	cacheManager       *cache.Manager
+	imageManager       *ImageManager
 	logTimeModal       *LogTimeModal
 	copyOptionsModal   *CopyOptionsModal
 	reportPreviewModal *ReportPreviewModal
@@ -41,6 +53,8 @@ type Model struct {
 	spinner            spinner.Model
 	cacheAge           time.Duration
 	fromCache          bool
+	currentTaskKey     string
+	pendingImageLoads  []ImageInfo
 }
 
 type transitionsFetchedMsg struct {
@@ -87,8 +101,13 @@ func NewModel(cfg *config.Manager) *Model {
 		tempoClient:    tempoClient,
 		config:         cfg,
 		cacheManager:   cacheManager,
-		spinner:        s,
-		fromCache:      false,
+		imageManager: NewImageManager(
+			cfg.GetJiraServer(),
+			cfg.GetUsername(),
+			cfg.GetApiToken(),
+		),
+		spinner:   s,
+		fromCache: false,
 	}
 }
 
@@ -581,6 +600,42 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case cacheSaveMsg:
 		return m, m.saveCacheCmd
+
+	case imageLoadedMsg:
+		if debugLog != nil {
+			debugLog.Printf("RECEIVED imageLoadedMsg: ID=%s HasImage=%v RenderedLen=%d Error=%v",
+				msg.ID, msg.Image != nil, len(msg.Rendered), msg.Error)
+		}
+		if m.imageManager != nil {
+			existing := m.imageManager.GetImage(msg.ID)
+			info := ImageInfo{ID: msg.ID}
+			if existing != nil {
+				info = existing.Info
+			}
+			if msg.Error != nil {
+				m.imageManager.SetImage(msg.ID, &LoadedImage{
+					Info:  info,
+					State: ImageStateFailed,
+					Error: msg.Error,
+				})
+				m.state.StatusMessage = fmt.Sprintf("❌ Image load failed: %s - %v", info.Filename, msg.Error)
+				if debugLog != nil {
+					debugLog.Printf("SET image state to FAILED: %s", msg.ID)
+				}
+			} else {
+				m.imageManager.SetImage(msg.ID, &LoadedImage{
+					Info:     info,
+					State:    ImageStateLoaded,
+					Image:    msg.Image,
+					Rendered: msg.Rendered,
+				})
+				m.state.StatusMessage = fmt.Sprintf("✅ Image loaded: %s", info.Filename)
+				if debugLog != nil {
+					debugLog.Printf("SET image state to LOADED: %s", msg.ID)
+				}
+			}
+		}
+		return m, nil
 	}
 
 	return m, nil
@@ -599,7 +654,7 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.state.MoveSelectionUp()
 		}
-		return m, nil
+		return m, m.checkAndLoadImagesForSelectedTask()
 
 	case "j", "down":
 		// Scroll down in Details panel if active, otherwise move selection
@@ -608,22 +663,22 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.state.MoveSelectionDown()
 		}
-		return m, nil
+		return m, m.checkAndLoadImagesForSelectedTask()
 
 	case "1":
 		m.state.ActivePanel = state.PanelReport
 		m.state.TimeTrackingExpanded = false
-		return m, nil
+		return m, m.checkAndLoadImagesForSelectedTask()
 
 	case "2":
 		m.state.ActivePanel = state.PanelTodo
 		m.state.TimeTrackingExpanded = false
-		return m, nil
+		return m, m.checkAndLoadImagesForSelectedTask()
 
 	case "3":
 		m.state.ActivePanel = state.PanelProcessing
 		m.state.TimeTrackingExpanded = false
-		return m, nil
+		return m, m.checkAndLoadImagesForSelectedTask()
 
 	case "4":
 		m.state.ActivePanel = state.PanelTimelog
@@ -1274,10 +1329,47 @@ func (m Model) renderDetailsPanelWithSize(width, height int) string {
 			items = append(items, wrappedSummary)
 			items = append(items, "")
 
-			// 5. Description with ADF parsing
+			// 5. Description with ADF parsing and inline images
 			items = append(items, itemStyle.Foreground(colorMuted).Render("Description:"))
-			descriptionLines := parseDescription(selectedTask.Fields.Description, contentWidth)
-			items = append(items, descriptionLines...)
+			jiraServer := m.config.GetJiraServer()
+			descContents := parseDescriptionWithImages(selectedTask.Fields.Description, contentWidth, jiraServer, selectedTask.Fields.Attachment)
+			for _, content := range descContents {
+				if content.Type == ContentTypeImage && content.ImageInfo != nil {
+					if m.imageManager != nil && m.imageManager.IsSupported() {
+						loadedImg := m.imageManager.GetImage(content.ImageInfo.ID)
+						if loadedImg != nil {
+							switch loadedImg.State {
+							case ImageStateLoaded:
+								rendered := RenderLoadedImage(loadedImg, contentWidth)
+								if rendered != "" {
+									for _, line := range strings.Split(rendered, "\n") {
+										items = append(items, line)
+									}
+								}
+							case ImageStateLoading:
+								placeholder := RenderImagePlaceholder(*content.ImageInfo, ImageStateLoading, contentWidth, m.spinner, nil)
+								for _, line := range strings.Split(placeholder, "\n") {
+									items = append(items, line)
+								}
+							case ImageStateFailed:
+								placeholder := RenderImagePlaceholder(*content.ImageInfo, ImageStateFailed, contentWidth, m.spinner, loadedImg.Error)
+								for _, line := range strings.Split(placeholder, "\n") {
+									items = append(items, line)
+								}
+							}
+						} else {
+							placeholder := RenderImagePlaceholder(*content.ImageInfo, ImageStateLoading, contentWidth, m.spinner, nil)
+							for _, line := range strings.Split(placeholder, "\n") {
+								items = append(items, line)
+							}
+						}
+					} else {
+						items = append(items, fmt.Sprintf("[Image: %s]", content.ImageInfo.Filename))
+					}
+				} else {
+					items = append(items, content.Text)
+				}
+			}
 		}
 	}
 
@@ -1493,4 +1585,78 @@ func formatDuration(d time.Duration) string {
 		return fmt.Sprintf("%dm", int(d.Minutes()))
 	}
 	return fmt.Sprintf("%dh", int(d.Hours()))
+}
+
+func (m *Model) checkAndLoadImagesForSelectedTask() tea.Cmd {
+	if m.imageManager == nil || !m.imageManager.IsSupported() {
+		if m.imageManager != nil && !m.imageManager.IsSupported() {
+			protocol := m.imageManager.GetProtocolName()
+			m.state.StatusMessage = fmt.Sprintf("Terminal protocol: %s (inline images not supported)", protocol)
+		}
+		return nil
+	}
+
+	if m.state.ActivePanel == state.PanelTimelog {
+		return nil
+	}
+
+	var selectedTask *model.Issue
+	var tasks []model.Issue
+	var idx int
+
+	activePanel := m.state.ActivePanel
+	if activePanel == state.PanelDetails {
+		activePanel = m.state.LastTaskPanel
+	}
+
+	switch activePanel {
+	case state.PanelReport:
+		tasks = m.state.ReportTasks
+		idx = m.state.SelectedIndices[state.PanelReport]
+	case state.PanelTodo:
+		tasks = m.state.TodoTasks
+		idx = m.state.SelectedIndices[state.PanelTodo]
+	case state.PanelProcessing:
+		tasks = m.state.ProcessingTasks
+		idx = m.state.SelectedIndices[state.PanelProcessing]
+	}
+
+	if len(tasks) > 0 && idx < len(tasks) {
+		selectedTask = &tasks[idx]
+	}
+
+	if selectedTask == nil {
+		return nil
+	}
+
+	if m.currentTaskKey == selectedTask.Key {
+		return nil
+	}
+
+	m.currentTaskKey = selectedTask.Key
+	m.imageManager.ClearCache()
+	m.pendingImageLoads = nil
+
+	jiraServer := m.config.GetJiraServer()
+	contents := parseDescriptionWithImages(selectedTask.Fields.Description, 80, jiraServer, selectedTask.Fields.Attachment)
+
+	var cmds []tea.Cmd
+	imageCount := 0
+	for _, content := range contents {
+		if content.Type == ContentTypeImage && content.ImageInfo != nil {
+			cmd := m.imageManager.LoadImageCmd(*content.ImageInfo, 60, 20)
+			cmds = append(cmds, cmd)
+			imageCount++
+		}
+	}
+
+	if imageCount > 0 {
+		m.state.StatusMessage = fmt.Sprintf("🔄 Loading %d image(s) for %s...", imageCount, selectedTask.Key)
+		if debugLog != nil {
+			debugLog.Printf("APP: Batching %d image load commands for task %s", imageCount, selectedTask.Key)
+		}
+		return tea.Batch(cmds...)
+	}
+
+	return nil
 }

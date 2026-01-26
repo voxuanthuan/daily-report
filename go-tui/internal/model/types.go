@@ -15,7 +15,16 @@ type IssueFields struct {
 	Priority    *Priority    `json:"priority,omitempty"`
 	Description interface{}  `json:"description,omitempty"`
 	FixVersions []FixVersion `json:"fixVersions,omitempty"`
+	Attachment  []Attachment `json:"attachment,omitempty"`
 	Updated     string       `json:"updated,omitempty"`
+}
+
+// Attachment represents a Jira attachment
+type Attachment struct {
+	ID       string `json:"id"`
+	Filename string `json:"filename"`
+	Content  string `json:"content"`
+	MimeType string `json:"mimeType"`
 }
 
 // Status represents the issue status
