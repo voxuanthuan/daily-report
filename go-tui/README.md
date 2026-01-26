@@ -113,6 +113,7 @@ Location: /home/user/.jira-daily-report.json
 ✅ **Concurrent Loading** - Parallel data fetching
 ✅ **Worklog Enrichment** - Shows task details with time logged
 ✅ **Dark Theme** - Beautiful terminal UI
+✅ **Image Preview** - Native Sixel/Kitty support with `viu` fallback
 ✅ **Single Binary** - No dependencies
 ✅ **Smart Caching** - Instant startup with cached data (enabled by default)
 
@@ -158,6 +159,15 @@ export JIRA_CACHE_TTL=60          # Cache TTL in minutes
 ---
 
 ## Install
+
+### Prerequisites (Optional)
+
+For the best image preview experience on terminals without native Sixel/Kitty support, install `viu`:
+
+- **macOS**: `brew install viu`
+- **Linux**: `cargo install viu` (or via your package manager)
+
+Without `viu`, image previews will only work in terminals with Sixel/Kitty/iTerm2 support (like WezTerm, iTerm2, Kitty).
 
 ### Option 1: Build from source
 ```bash
