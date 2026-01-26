@@ -29,13 +29,13 @@ func BuildMainReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDa
 	aggregatedPrev := aggregateWorklogs(prevTasks)
 	if len(aggregatedPrev) > 0 {
 		for _, item := range aggregatedPrev {
-			sb.WriteString(fmt.Sprintf("● %s: %s\n", item.Issue.Key, item.Issue.Summary))
+			sb.WriteString(fmt.Sprintf("  ●  %s: %s\n", item.Issue.Key, item.Issue.Summary))
 			for _, desc := range item.Descriptions {
-				sb.WriteString(fmt.Sprintf("  ○ %s\n", desc))
+				sb.WriteString(fmt.Sprintf("       ○ %s\n", desc))
 			}
 		}
 	} else {
-		sb.WriteString("● No tasks logged.\n")
+		sb.WriteString("  ●  No tasks logged.\n")
 	}
 
 	sb.WriteString("Today\n")
@@ -57,10 +57,10 @@ func BuildMainReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDa
 
 	if len(tasks) > 0 {
 		for _, t := range tasks {
-			sb.WriteString(fmt.Sprintf("● %s: %s\n", t.Key, t.Fields.Summary))
+			sb.WriteString(fmt.Sprintf("  ●  %s: %s\n", t.Key, t.Fields.Summary))
 		}
 	} else {
-		sb.WriteString("● No tasks planned.\n")
+		sb.WriteString("  ●  No tasks planned.\n")
 	}
 
 	sb.WriteString("No blockers\n")
@@ -68,7 +68,7 @@ func BuildMainReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDa
 	if len(stories) > 0 {
 		sb.WriteString("\n.\n\nIn-Progress (Story)\n")
 		for _, s := range stories {
-			sb.WriteString(fmt.Sprintf("● %s: %s\n", s.Key, s.Fields.Summary))
+			sb.WriteString(fmt.Sprintf("  ●  %s: %s\n", s.Key, s.Fields.Summary))
 		}
 	}
 

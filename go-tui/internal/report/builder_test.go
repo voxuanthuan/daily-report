@@ -50,12 +50,12 @@ func TestBuildMainReport_AggregationAndFiltering(t *testing.T) {
 
 	// Verify structure
 	// Should look something like:
-	// ● GRAP-123: Task 1
-	//   ○ Real description 1
-	//   ○ Real description 2
-	expectedSubBullets := "  ○ Real description 1\n  ○ Real description 2"
+	//   ●  GRAP-123: Task 1
+	//       ○ Real description 1
+	//       ○ Real description 2
+	expectedSubBullets := "       ○ Real description 1\n       ○ Real description 2"
 	if !strings.Contains(report, expectedSubBullets) {
-		t.Errorf("Report incorrectly formatted sub-bullets. Expected contiguous:\n%s\nGot:\n%s", expectedSubBullets, report)
+		t.Errorf("Report incorrectly formatted sub-bullets. Expected contiguous:\n%q\nGot:\n%q", expectedSubBullets, report)
 	}
 }
 
