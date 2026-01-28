@@ -23,3 +23,5 @@ export JIRA_USERNAME="your-email@example.com"
 export JIRA_API_TOKEN="your-jira-api-token"
 export TEMPO_API_TOKEN="your-tempo-api-token"
 ```
+
+📖 **[New Authentication Guide →](README_AUTHENTICATE.md)**
