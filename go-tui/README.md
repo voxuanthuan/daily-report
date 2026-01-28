@@ -42,6 +42,22 @@ Create `~/.jira-daily-report.json` manually (see Configuration File section)
 
 ---
 
+## 🔐 Authentication
+
+**New!** OAuth 2.0 authentication - log in with your browser, no API tokens needed!
+
+```bash
+# Setup OAuth credentials (one time)
+jira-report auth init
+
+# Login via browser
+jira-report auth login
+```
+
+📖 **[Full Authentication Guide →](README_AUTHENTICATE.md)**
+
+---
+
 ## Commands
 
 ### `jira-report tui`
