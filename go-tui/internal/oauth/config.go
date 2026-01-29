@@ -28,14 +28,14 @@ func NewConfig(clientID, clientSecret, callbackURL string) *Config {
 		oauth2: &oauth2.Config{
 			ClientID:     clientID,
 			ClientSecret: clientSecret,
-			Scopes:       []string{"read:jira-work", "write:jira-work", "read:me", "offline_access"},
+			Scopes:       []string{"read:jira-work", "write:jira-work", "read:jira-user", "read:me", "offline_access"},
 			Endpoint: oauth2.Endpoint{
 				AuthURL:  AuthURL,
 				TokenURL: TokenURL,
 			},
 			RedirectURL: callbackURL,
 		},
-		Scopes: []string{"read:jira-work", "write:jira-work", "read:me", "offline_access"},
+		Scopes: []string{"read:jira-work", "write:jira-work", "read:jira-user", "read:me", "offline_access"},
 	}
 }
 

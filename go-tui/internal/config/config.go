@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/yourusername/jira-daily-report/internal/oauth"
 )
 
 // Config holds the application configuration
@@ -79,12 +81,20 @@ func loadConfig() (*Config, error) {
 	if config.JiraServer == "" {
 		return nil, fmt.Errorf("JIRA_SERVER is required (set via config file or environment variable)")
 	}
-	if config.Username == "" {
-		return nil, fmt.Errorf("JIRA_EMAIL/JIRA_USERNAME is required (set via config file or environment variable)")
+
+	// Try to load OAuth token from keyring
+	oauthToken := loadOAuthToken()
+
+	// If OAuth is available, username and apiToken are optional
+	if oauthToken == "" {
+		if config.Username == "" {
+			return nil, fmt.Errorf("JIRA_EMAIL/JIRA_USERNAME is required (set via config file or environment variable)")
+		}
+		if config.ApiToken == "" {
+			return nil, fmt.Errorf("JIRA_API_TOKEN is required (set via config file or environment variable)")
+		}
 	}
-	if config.ApiToken == "" {
-		return nil, fmt.Errorf("JIRA_API_TOKEN is required (set via config file or environment variable)")
-	}
+
 	if config.TempoApiToken == "" {
 		return nil, fmt.Errorf("TEMPO_API_TOKEN is required (set via config file or environment variable)")
 	}
@@ -95,6 +105,27 @@ func loadConfig() (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+// loadOAuthToken attempts to load OAuth token from keyring
+func loadOAuthToken() string {
+	// Create a token store and try to load the token
+	store := oauth.NewTokenStore()
+
+	// Try to get a valid token (will refresh if needed)
+	// We need a config to refresh, but we'll just try to load the stored token
+	token, err := store.LoadToken()
+	if err != nil {
+		return "" // No OAuth token available
+	}
+
+	// Check if token is still valid (not expired)
+	// If expired and we can't refresh without config, return empty
+	if token.Valid() {
+		return token.AccessToken
+	}
+
+	return "" // Token expired or invalid
 }
 
 // GetJiraServer returns the Jira server URL
@@ -120,6 +151,11 @@ func (m *Manager) GetTempoApiToken() string {
 // GetWhoAmI returns the user account ID
 func (m *Manager) GetWhoAmI() string {
 	return m.config.WhoAmI
+}
+
+// GetOAuthToken returns the OAuth Bearer token if available
+func (m *Manager) GetOAuthToken() string {
+	return loadOAuthToken()
 }
 
 // GetTheme returns the theme setting

@@ -47,11 +47,17 @@ type transitionsFetchedMsg struct {
 
 // NewModel creates a new TUI model
 func NewModel(cfg *config.Manager) *Model {
-	jiraClient := api.NewJiraClient(
-		cfg.GetJiraServer(),
-		cfg.GetUsername(),
-		cfg.GetApiToken(),
-	)
+	// Prefer OAuth if available, fallback to Basic Auth
+	var jiraClient *api.JiraClient
+	if oauthToken := cfg.GetOAuthToken(); oauthToken != "" {
+		jiraClient = api.NewOAuthJiraClient(cfg.GetJiraServer(), oauthToken)
+	} else {
+		jiraClient = api.NewJiraClient(
+			cfg.GetJiraServer(),
+			cfg.GetUsername(),
+			cfg.GetApiToken(),
+		)
+	}
 
 	tempoClient := api.NewTempoClient(
 		cfg.GetTempoApiToken(),

@@ -43,12 +43,17 @@ Separated by comma. Supported units: h, m.`,
 			fmt.Println("Processing time logs...")
 		}
 
-		// Initialize clients
-		jiraClient := api.NewJiraClient(
-			cfg.GetJiraServer(),
-			cfg.GetUsername(),
-			cfg.GetApiToken(),
-		)
+		// Initialize clients - prefer OAuth if available
+		var jiraClient *api.JiraClient
+		if oauthToken := cfg.GetOAuthToken(); oauthToken != "" {
+			jiraClient = api.NewOAuthJiraClient(cfg.GetJiraServer(), oauthToken)
+		} else {
+			jiraClient = api.NewJiraClient(
+				cfg.GetJiraServer(),
+				cfg.GetUsername(),
+				cfg.GetApiToken(),
+			)
+		}
 
 		tempoClient := api.NewTempoClient(
 			cfg.GetTempoApiToken(),

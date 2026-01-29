@@ -19,7 +19,7 @@ func (c *JiraClient) GetTransitions(issueKey string) ([]jira.Transition, error) 
 		return nil, err
 	}
 
-	req.SetBasicAuth(c.username, c.apiToken)
+	c.setAuth(req)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.client.Do(req)
@@ -71,7 +71,7 @@ func (c *JiraClient) TransitionIssue(issueKey string, transitionID string) error
 		return err
 	}
 
-	req.SetBasicAuth(c.username, c.apiToken)
+	c.setAuth(req)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.client.Do(req)

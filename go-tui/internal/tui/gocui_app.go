@@ -1,10 +1,11 @@
 package tui
 
 import (
-	"github.com/yourusername/jira-daily-report/internal/tui/state"
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/yourusername/jira-daily-report/internal/tui/state"
 
 	"github.com/jroimartin/gocui"
 	"github.com/yourusername/jira-daily-report/internal/api"
@@ -48,11 +49,17 @@ func NewGui(cfg *config.Manager) (*Gui, error) {
 	// Restore original TERM after successful init
 	os.Setenv("TERM", originalTerm)
 
-	jiraClient := api.NewJiraClient(
-		cfg.GetJiraServer(),
-		cfg.GetUsername(),
-		cfg.GetApiToken(),
-	)
+	// Prefer OAuth if available, fallback to Basic Auth
+	var jiraClient *api.JiraClient
+	if oauthToken := cfg.GetOAuthToken(); oauthToken != "" {
+		jiraClient = api.NewOAuthJiraClient(cfg.GetJiraServer(), oauthToken)
+	} else {
+		jiraClient = api.NewJiraClient(
+			cfg.GetJiraServer(),
+			cfg.GetUsername(),
+			cfg.GetApiToken(),
+		)
+	}
 
 	tempoClient := api.NewTempoClient(
 		cfg.GetTempoApiToken(),

@@ -23,9 +23,18 @@ func (c *JiraClient) buildRequest(method, url string, body interface{}) (*http.R
 		return nil, err
 	}
 
-	req.SetBasicAuth(c.username, c.apiToken)
+	c.setAuth(req)
 	req.Header.Set("Content-Type", "application/json")
 	return req, nil
+}
+
+// setAuth sets authentication header - prefers OAuth Bearer token, falls back to Basic Auth
+func (c *JiraClient) setAuth(req *http.Request) {
+	if c.oauthToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.oauthToken)
+	} else {
+		req.SetBasicAuth(c.username, c.apiToken)
+	}
 }
 
 // decodeResponse decodes a JSON response
