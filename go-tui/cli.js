@@ -33,6 +33,15 @@ if (!fs.existsSync(binaryPath)) {
   process.exit(1);
 }
 
+// Ensure binary is executable (fix permissions if needed)
+if (process.platform !== 'win32') {
+  try {
+    fs.chmodSync(binaryPath, 0o755);
+  } catch (err) {
+    console.error(`Warning: Could not set executable permissions: ${err.message}`);
+  }
+}
+
 // Execute the binary
 const child = spawn(binaryPath, process.argv.slice(2), {
   stdio: 'inherit',
