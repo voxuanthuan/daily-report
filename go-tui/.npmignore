@@ -52,3 +52,6 @@ bin/jira-tui
 
 # Root-level development binaries (not needed for npm package)
 jira-report-tui
+
+# Install script (not needed since cli.js handles permissions)
+install.js
