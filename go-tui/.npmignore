@@ -43,3 +43,12 @@ video-intro/
 
 # GitHub workflows
 .github/
+
+# Platform-specific binaries (only publish Linux)
+bin/*darwin*
+bin/*windows*
+bin/jira-report
+bin/jira-tui
+
+# Root-level development binaries (not needed for npm package)
+jira-report-tui

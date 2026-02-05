@@ -39,9 +39,7 @@
     "node": ">=14.0.0"
   },
   "os": [
-    "linux",
-    "darwin",
-    "win32"
+    "linux"
   ],
   "cpu": [
     "x64",
