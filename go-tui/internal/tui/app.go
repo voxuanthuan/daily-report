@@ -114,7 +114,6 @@ type worklogsLoadedMsg struct {
 	err        error
 }
 
-// startPhase2Msg is sent to trigger Phase 2 loading after UI update
 type startPhase2Msg struct{}
 
 // loadTasksCmd fetches user and tasks (fast path - Phase 1)
@@ -211,30 +210,32 @@ func sortIssuesByUpdatedDesc(issues []model.Issue) []model.Issue {
 }
 
 // loadWorklogsCmd fetches worklogs and enriches them (background - Phase 2)
-func (m *Model) loadWorklogsCmd() tea.Msg {
-	if m.state.User == nil {
-		return worklogsLoadedMsg{err: fmt.Errorf("user not loaded")}
-	}
+func (m *Model) loadWorklogsCmd() tea.Cmd {
+	return tea.Tick(10*time.Millisecond, func(t time.Time) tea.Msg {
+		if m.state.User == nil {
+			return worklogsLoadedMsg{err: fmt.Errorf("user not loaded")}
+		}
 
-	// Fetch worklogs using the user's account ID
-	worklogs, err := m.tempoClient.FetchLastSixDaysWorklogs(m.state.User.AccountID)
-	if err != nil {
-		return worklogsLoadedMsg{err: err}
-	}
+		// Fetch worklogs using the user's account ID
+		worklogs, err := m.tempoClient.FetchLastSixDaysWorklogs(m.state.User.AccountID)
+		if err != nil {
+			return worklogsLoadedMsg{err: err}
+		}
 
-	// Enrich with issue details
-	enriched, err := m.tempoClient.EnrichWorklogsWithIssueDetails(worklogs)
-	if err != nil {
-		return worklogsLoadedMsg{err: err}
-	}
+		// Enrich with issue details
+		enriched, err := m.tempoClient.EnrichWorklogsWithIssueDetails(worklogs)
+		if err != nil {
+			return worklogsLoadedMsg{err: err}
+		}
 
-	// Group by date
-	dateGroups := groupWorklogsByDate(enriched)
+		// Group by date
+		dateGroups := groupWorklogsByDate(enriched)
 
-	return worklogsLoadedMsg{
-		worklogs:   enriched,
-		dateGroups: dateGroups,
-	}
+		return worklogsLoadedMsg{
+			worklogs:   enriched,
+			dateGroups: dateGroups,
+		}
+	})
 }
 
 // Update handles messages and updates the model
@@ -335,9 +336,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case startPhase2Msg:
 		// Triggered after UI has had time to render Phase 1 results
-		return m, func() tea.Msg {
-			return m.loadWorklogsCmd()
-		}
+		return m, m.loadWorklogsCmd()
+
+
+
+
+
 
 	case dataLoadedMsg:
 		// Legacy handler - keep for compatibility
@@ -998,6 +1002,7 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 
 			// Get emoji icon for issue type
 			icon := GetIssueIcon(task.Fields.IssueType.Name)
+
 			// Truncate summary to fit width
 			maxSummaryLen := width - len(icon) - len(task.Key) - 8
 			summary := task.Fields.Summary
@@ -1216,15 +1221,16 @@ func (m Model) renderDetailsPanelWithSize(width, height int) string {
 			// 2. Status (de-emphasized)
 			items = append(items, itemStyle.Foreground(colorMuted).Render("⏺ "+selectedTask.Fields.Status.Name))
 
-			// 3. Fix Versions (prominently displayed if present)
+			// 3. Fix Versions
 			if len(selectedTask.Fields.FixVersions) > 0 {
 				versionNames := make([]string, len(selectedTask.Fields.FixVersions))
 				for i, v := range selectedTask.Fields.FixVersions {
 					versionNames[i] = v.Name
 				}
-				fixVersionText := "🏷️  Fix Version: " + strings.Join(versionNames, ", ")
-				items = append(items, selectedItemStyle.Render(fixVersionText))
+				fixVersionText := "Fix Version: " + strings.Join(versionNames, ", ")
+				items = append(items, itemStyle.Foreground(colorMuted).Render(fixVersionText))
 			}
+
 			items = append(items, "")
 
 			// 4. Task Title/Summary
@@ -1238,6 +1244,7 @@ func (m Model) renderDetailsPanelWithSize(width, height int) string {
 			descriptionLines := parseDescription(selectedTask.Fields.Description, contentWidth)
 			items = append(items, descriptionLines...)
 		}
+
 	}
 
 	// Store content lines for scrolling

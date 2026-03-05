@@ -36,6 +36,8 @@ type State struct {
 	DetailsContentLines  []string     // Cached content lines for scrolling
 	Loading              bool         // Main loading state (blocks UI)
 	WorklogsLoading      bool         // Background worklog loading (doesn't block UI)
+	WorklogsLoadProgress float64      // Worklog loading progress (0.0 - 1.0)
+	WorklogsLoadStep     string       // Current loading step description
 	StatusMessage        string
 	Error                error
 

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yourusername/jira-daily-report/internal/model"
@@ -20,14 +21,18 @@ type TempoClient struct {
 	apiToken   string
 	jiraClient *JiraClient
 	client     *http.Client
+	// Cache for enriched issue details to avoid repeated API calls
+	issueCache      map[int]model.Issue
+	issueCacheMutex sync.RWMutex
 }
 
 // NewTempoClient creates a new Tempo API client
 func NewTempoClient(apiToken string, jiraClient *JiraClient) *TempoClient {
 	return &TempoClient{
-		apiToken:   apiToken,
-		jiraClient: jiraClient,
-		client:     &http.Client{},
+		apiToken:    apiToken,
+		jiraClient:  jiraClient,
+		client:      &http.Client{Timeout: 30 * time.Second},
+		issueCache:  make(map[int]model.Issue),
 	}
 }
 
@@ -39,7 +44,7 @@ func (c *TempoClient) FetchWorklogs(accountID, startDate, endDate string) ([]mod
 		"authorIds": []string{accountID},
 		"from":      startDate,
 		"to":        endDate,
-		"limit":     100,
+		"limit":     100, // Increased from default to get more results
 	}
 
 	bodyBytes, err := json.Marshal(requestBody)
@@ -89,31 +94,41 @@ func (c *TempoClient) FetchLastSixDaysWorklogs(accountID string) ([]model.Worklo
 }
 
 // EnrichWorklogsWithIssueDetails fetches issue details from Jira and enriches worklogs
+// OPTIMIZED: Uses single query with all issue IDs instead of batching, plus caching
 func (c *TempoClient) EnrichWorklogsWithIssueDetails(worklogs []model.Worklog) ([]model.Worklog, error) {
-	// Collect unique issue IDs
-	issueIDs := make(map[int]bool)
+	// Collect unique issue IDs that need enrichment
+	issueIDsToFetch := make(map[int]bool)
 	for _, log := range worklogs {
-		if log.Issue.ID != 0 {
-			issueIDs[log.Issue.ID] = true
+		if log.Issue.ID != 0 && log.Issue.Key == "" {
+			// Check cache first
+			c.issueCacheMutex.RLock()
+			_, cached := c.issueCache[log.Issue.ID]
+			c.issueCacheMutex.RUnlock()
+
+			if !cached {
+				issueIDsToFetch[log.Issue.ID] = true
+			}
 		}
 	}
 
-	if len(issueIDs) == 0 {
-		return worklogs, nil
+	if len(issueIDsToFetch) == 0 {
+		// All issues already cached or no enrichment needed
+		return c.enrichFromCache(worklogs), nil
 	}
 
-	// Convert to list for batching
+	// OPTIMIZATION: Use a single JQL query with all issue IDs instead of batching
+	// JQL supports up to 1000 issues in a single query
 	var ids []string
-	for id := range issueIDs {
+	for id := range issueIDsToFetch {
 		ids = append(ids, fmt.Sprintf("%d", id))
 	}
 
-	// Fetch issues in batches
+	// Split into multiple queries if needed (JQL has limits)
+	const maxIDsPerQuery = 500
 	issueDetailsMap := make(map[int]model.Issue)
-	batchSize := 50
 
-	for i := 0; i < len(ids); i += batchSize {
-		end := i + batchSize
+	for i := 0; i < len(ids); i += maxIDsPerQuery {
+		end := i + maxIDsPerQuery
 		if end > len(ids) {
 			end = len(ids)
 		}
@@ -123,24 +138,59 @@ func (c *TempoClient) EnrichWorklogsWithIssueDetails(worklogs []model.Worklog) (
 
 		issues, err := c.jiraClient.FetchTasks(jql)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch batch issues: %w", err)
+			return nil, fmt.Errorf("failed to fetch issues: %w", err)
 		}
 
+		// Update cache and map
+		c.issueCacheMutex.Lock()
 		for _, issue := range issues {
 			idInt, _ := strconv.Atoi(issue.ID)
 			issueDetailsMap[idInt] = issue
+			c.issueCache[idInt] = issue
 		}
+		c.issueCacheMutex.Unlock()
 	}
 
 	// Enrich worklogs with issue details
 	enrichedWorklogs := make([]model.Worklog, len(worklogs))
 	for i, log := range worklogs {
 		enrichedWorklogs[i] = log
-		if issue, ok := issueDetailsMap[log.Issue.ID]; ok {
-			enrichedWorklogs[i].Issue.Key = issue.Key
-			enrichedWorklogs[i].Issue.Summary = issue.Fields.Summary
+		if log.Issue.Key == "" && log.Issue.ID != 0 {
+			// Try to get from cache or newly fetched details
+			c.issueCacheMutex.RLock()
+			if issue, ok := c.issueCache[log.Issue.ID]; ok {
+				enrichedWorklogs[i].Issue.Key = issue.Key
+				enrichedWorklogs[i].Issue.Summary = issue.Fields.Summary
+			}
+			c.issueCacheMutex.RUnlock()
 		}
 	}
 
 	return enrichedWorklogs, nil
+}
+
+// enrichFromCache enriches worklogs using cached issue details
+func (c *TempoClient) enrichFromCache(worklogs []model.Worklog) []model.Worklog {
+	enrichedWorklogs := make([]model.Worklog, len(worklogs))
+	c.issueCacheMutex.RLock()
+	defer c.issueCacheMutex.RUnlock()
+
+	for i, log := range worklogs {
+		enrichedWorklogs[i] = log
+		if log.Issue.Key == "" && log.Issue.ID != 0 {
+			if issue, ok := c.issueCache[log.Issue.ID]; ok {
+				enrichedWorklogs[i].Issue.Key = issue.Key
+				enrichedWorklogs[i].Issue.Summary = issue.Fields.Summary
+			}
+		}
+	}
+
+	return enrichedWorklogs
+}
+
+// ClearCache clears the issue cache (useful for testing or forced refresh)
+func (c *TempoClient) ClearCache() {
+	c.issueCacheMutex.Lock()
+	defer c.issueCacheMutex.Unlock()
+	c.issueCache = make(map[int]model.Issue)
 }

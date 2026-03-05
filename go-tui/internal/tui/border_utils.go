@@ -30,13 +30,17 @@ var (
 
 // RenderWithTitleAndCounter renders content with custom border
 // Title is embedded in the top border, counter in the bottom-right
+// This uses Lipgloss for beautiful styling
 func RenderWithTitleAndCounter(content string, width, height int, title string, counter string, isActive bool, borderChars BorderChars) string {
-	// Choose border color based on active state
+	// Choose border color based on active state - use vibrant colors for active
 	borderColor := colorBorder
 	titleColor := colorBorder
+	bgColor := colorBgDark
+
 	if isActive {
 		borderColor = colorPrimary
 		titleColor = colorPrimary
+		bgColor = colorBgSelected // Subtle background highlight for active panel
 	}
 
 	// Calculate available width for border content (exclude corners)
@@ -47,7 +51,12 @@ func RenderWithTitleAndCounter(content string, width, height int, title string, 
 
 	// BUILD TOP BORDER with embedded title
 	// Format: "╭─[1] Report─────────╮"
-	titleRendered := lipgloss.NewStyle().Foreground(titleColor).Bold(true).Render(title)
+	// Use more vibrant title styling
+	titleRendered := lipgloss.NewStyle().
+		Foreground(titleColor).
+		Background(bgColor).
+		Bold(true).
+		Render(title)
 	titleWidth := lipgloss.Width(titleRendered)
 
 	// Calculate how many horizontal chars to fill
@@ -64,7 +73,11 @@ func RenderWithTitleAndCounter(content string, width, height int, title string, 
 			truncateLen = 0
 		}
 		safeTitle := string(runesModule[:truncateLen])
-		titleRendered = lipgloss.NewStyle().Foreground(titleColor).Bold(true).Render(safeTitle)
+		titleRendered = lipgloss.NewStyle().
+			Foreground(titleColor).
+			Background(bgColor).
+			Bold(true).
+			Render(safeTitle)
 	}
 
 	topBorder := lipgloss.NewStyle().Foreground(borderColor).Render(borderChars.TopLeft) +
@@ -74,10 +87,20 @@ func RenderWithTitleAndCounter(content string, width, height int, title string, 
 
 	// BUILD BOTTOM BORDER with counter on right
 	// Format: "╰──────────1 of 5─╯"
+	// Use styled counter with better colors
 	counterRendered := ""
 	counterWidth := 0
 	if counter != "" {
-		counterRendered = lipgloss.NewStyle().Foreground(colorMuted).Render(counter)
+		if isActive {
+			counterRendered = lipgloss.NewStyle().
+				Foreground(colorSuccess).
+				Bold(true).
+				Render(counter)
+		} else {
+			counterRendered = lipgloss.NewStyle().
+				Foreground(colorFgDim).
+				Render(counter)
+		}
 		counterWidth = lipgloss.Width(counterRendered)
 	}
 
@@ -121,6 +144,7 @@ func RenderWithTitleAndCounter(content string, width, height int, title string, 
 			rightPadding = 0
 		}
 
+		// Style the vertical borders and content
 		borderedLine := lipgloss.NewStyle().Foreground(borderColor).Render(borderChars.Vertical) +
 			strings.Repeat(" ", paddingLeft) +
 			line +
