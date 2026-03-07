@@ -30,7 +30,7 @@ func BuildMainReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDa
 	if len(uniquePrev) > 0 {
 		for _, w := range uniquePrev {
 			sb.WriteString(fmt.Sprintf("  ● %s: %s\n", w.Issue.Key, w.Issue.Summary))
-			if w.Description != "" {
+			if w.Description != "" && !strings.HasPrefix(strings.ToLower(w.Description), "working on issue") {
 				sb.WriteString(fmt.Sprintf("     ○ %s\n", w.Description))
 			}
 		}
