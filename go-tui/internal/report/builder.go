@@ -26,12 +26,29 @@ func BuildMainReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDa
 	sb.WriteString("Hi everyone,\n")
 	sb.WriteString(label + "\n")
 
-	uniquePrev := deduplicateWorklogs(prevTasks)
-	if len(uniquePrev) > 0 {
-		for _, w := range uniquePrev {
-			sb.WriteString(fmt.Sprintf("  ● %s: %s\n", w.Issue.Key, w.Issue.Summary))
-			if w.Description != "" && !strings.HasPrefix(strings.ToLower(w.Description), "working on issue") {
-				sb.WriteString(fmt.Sprintf("     ○ %s\n", w.Description))
+	groupedPrev := groupWorklogsByIssue(prevTasks)
+	if len(groupedPrev) > 0 {
+		// Get unique issue keys and sort them for consistent output
+		issueKeys := make([]string, 0, len(groupedPrev))
+		for key := range groupedPrev {
+			issueKeys = append(issueKeys, key)
+		}
+		sort.Strings(issueKeys)
+
+		for _, key := range issueKeys {
+			worklogs := groupedPrev[key]
+			if len(worklogs) == 0 {
+				continue
+			}
+
+			// Use the first worklog for issue details (all have same issue key/summary)
+			sb.WriteString(fmt.Sprintf("  ● %s: %s\n", worklogs[0].Issue.Key, worklogs[0].Issue.Summary))
+
+			// Display all non-default descriptions
+			for _, w := range worklogs {
+				if !isDefaultDescription(w.Description) {
+					sb.WriteString(fmt.Sprintf("     ○ %s\n", strings.TrimSpace(w.Description)))
+				}
 			}
 		}
 	} else {
@@ -150,16 +167,29 @@ func BuildTodoList(todo []model.Issue, inProgress []model.Issue) string {
 
 // Helpers
 
-func deduplicateWorklogs(worklogs []model.Worklog) []model.Worklog {
-	seen := make(map[string]bool)
-	var result []model.Worklog
+// groupWorklogsByIssue groups worklogs by their issue key while preserving order
+func groupWorklogsByIssue(worklogs []model.Worklog) map[string][]model.Worklog {
+	grouped := make(map[string][]model.Worklog)
 	for _, w := range worklogs {
-		if !seen[w.Issue.Key] {
-			seen[w.Issue.Key] = true
-			result = append(result, w)
-		}
+		grouped[w.Issue.Key] = append(grouped[w.Issue.Key], w)
 	}
-	return result
+	return grouped
+}
+
+// isDefaultDescription checks if a description is a default/auto-generated one
+func isDefaultDescription(desc string) bool {
+	desc = strings.TrimSpace(desc)
+	if desc == "" {
+		return true
+	}
+
+	descLower := strings.ToLower(desc)
+	// Check for "working on issue" prefix (case-insensitive)
+	if strings.HasPrefix(descLower, "working on issue") {
+		return true
+	}
+
+	return false
 }
 
 func deduplicateIssues(issues []model.Issue) []model.Issue {
