@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/yourusername/jira-daily-report/internal/model"
 )
@@ -73,19 +74,36 @@ type JiraClient struct {
 	client     *http.Client
 }
 
-// NewJiraClient creates a new Jira API client
+// NewJiraClient creates a new Jira API client with optimized HTTP transport
 func NewJiraClient(baseURL, username, apiToken string) *JiraClient {
+	transport := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 20,
+		IdleConnTimeout:     90 * time.Second,
+		DisableCompression:  false,
+	}
+	
 	return &JiraClient{
 		baseURL:  baseURL,
 		username: username,
 		apiToken: apiToken,
-		client:   &http.Client{},
+		client: &http.Client{
+			Transport: transport,
+			Timeout:   30 * time.Second,
+		},
 	}
 }
 
 // NewOAuthJiraClient creates a new Jira API client using OAuth Bearer token
 // For OAuth with Atlassian Cloud, we need to use api.atlassian.com/ex/jira/{cloudId} pattern
 func NewOAuthJiraClient(siteURL, oauthToken string) *JiraClient {
+	transport := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 20,
+		IdleConnTimeout:     90 * time.Second,
+		DisableCompression:  false,
+	}
+	
 	// Get cloud ID for the site
 	cloudID, err := getCloudIDForSite(siteURL, oauthToken)
 	if err != nil {
@@ -94,7 +112,10 @@ func NewOAuthJiraClient(siteURL, oauthToken string) *JiraClient {
 		return &JiraClient{
 			baseURL:    siteURL,
 			oauthToken: oauthToken,
-			client:     &http.Client{},
+			client: &http.Client{
+				Transport: transport,
+				Timeout:   30 * time.Second,
+			},
 		}
 	}
 
@@ -103,7 +124,10 @@ func NewOAuthJiraClient(siteURL, oauthToken string) *JiraClient {
 	return &JiraClient{
 		baseURL:    baseURL,
 		oauthToken: oauthToken,
-		client:     &http.Client{},
+		client: &http.Client{
+			Transport: transport,
+			Timeout:   30 * time.Second,
+		},
 	}
 }
 

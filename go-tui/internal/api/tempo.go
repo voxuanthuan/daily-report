@@ -14,7 +14,10 @@ import (
 	"github.com/yourusername/jira-daily-report/internal/model"
 )
 
-const tempoBaseURL = "https://api.tempo.io/4"
+const (
+	tempoBaseURL   = "https://api.tempo.io/4"
+	maxIDsPerQuery = 500 // JQL supports up to 500-1000 IDs per query
+)
 
 // TempoClient handles Tempo API requests
 type TempoClient struct {
@@ -26,17 +29,28 @@ type TempoClient struct {
 	issueCacheMutex sync.RWMutex
 }
 
-// NewTempoClient creates a new Tempo API client
+// NewTempoClient creates a new Tempo API client with optimized HTTP transport
 func NewTempoClient(apiToken string, jiraClient *JiraClient) *TempoClient {
+	transport := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 20,
+		IdleConnTimeout:     90 * time.Second,
+		DisableCompression:  false,
+	}
+
 	return &TempoClient{
 		apiToken:    apiToken,
 		jiraClient:  jiraClient,
-		client:      &http.Client{Timeout: 30 * time.Second},
+		client: &http.Client{
+			Transport: transport,
+			Timeout:   30 * time.Second,
+		},
 		issueCache:  make(map[int]model.Issue),
 	}
 }
 
 // FetchWorklogs retrieves worklogs for a date range
+// OPTIMIZED: Increased limit to reduce pagination
 func (c *TempoClient) FetchWorklogs(accountID, startDate, endDate string) ([]model.Worklog, error) {
 	endpoint := fmt.Sprintf("%s/worklogs/search", tempoBaseURL)
 
@@ -44,7 +58,7 @@ func (c *TempoClient) FetchWorklogs(accountID, startDate, endDate string) ([]mod
 		"authorIds": []string{accountID},
 		"from":      startDate,
 		"to":        endDate,
-		"limit":     100, // Increased from default to get more results
+		"limit":     1000, // Increased from 100 to 1000 to reduce API calls
 	}
 
 	bodyBytes, err := json.Marshal(requestBody)
@@ -124,7 +138,6 @@ func (c *TempoClient) EnrichWorklogsWithIssueDetails(worklogs []model.Worklog) (
 	}
 
 	// Split into multiple queries if needed (JQL has limits)
-	const maxIDsPerQuery = 500
 	issueDetailsMap := make(map[int]model.Issue)
 
 	for i := 0; i < len(ids); i += maxIDsPerQuery {

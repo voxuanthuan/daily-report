@@ -117,62 +117,32 @@ type worklogsLoadedMsg struct {
 type startPhase2Msg struct{}
 
 // loadTasksCmd fetches user and tasks (fast path - Phase 1)
+// OPTIMIZED: Now uses FetchAllTasks which combines 4 queries into 1 HTTP request
 func (m *Model) loadTasksCmd() tea.Msg {
-	// Fetch current user
-	user, err := m.jiraClient.FetchCurrentUser()
+	username := m.config.GetUsername()
+
+	// Fetch user and all tasks in parallel
+	type result struct {
+		user   *model.User
+		err    error
+	}
+	userChan := make(chan result, 1)
+
+	go func() {
+		user, err := m.jiraClient.FetchCurrentUser()
+		userChan <- result{user, err}
+	}()
+
+	// Fetch all task categories in a single HTTP request (was 4 parallel requests)
+	inProgress, todo, underReview, testing, err := m.jiraClient.FetchAllTasks(username)
 	if err != nil {
 		return errMsg{err}
 	}
 
-	username := m.config.GetUsername()
-
-	// Fetch tasks in parallel
-	type taskResult struct {
-		name   string
-		issues []model.Issue
-		err    error
-	}
-
-	taskChan := make(chan taskResult, 4)
-
-	// Launch all task fetches in parallel
-	go func() {
-		issues, err := m.jiraClient.FetchInProgressTasks(username)
-		taskChan <- taskResult{"inProgress", issues, err}
-	}()
-
-	go func() {
-		issues, err := m.jiraClient.FetchOpenTasks(username)
-		taskChan <- taskResult{"todo", issues, err}
-	}()
-
-	go func() {
-		issues, err := m.jiraClient.FetchUnderReviewTasks(username)
-		taskChan <- taskResult{"underReview", issues, err}
-	}()
-
-	go func() {
-		issues, err := m.jiraClient.FetchReadyForTestingTasks(username)
-		taskChan <- taskResult{"testing", issues, err}
-	}()
-
-	// Collect results
-	var inProgress, todo, underReview, testing []model.Issue
-	for i := 0; i < 4; i++ {
-		result := <-taskChan
-		if result.err != nil {
-			return errMsg{result.err}
-		}
-		switch result.name {
-		case "inProgress":
-			inProgress = result.issues
-		case "todo":
-			todo = result.issues
-		case "underReview":
-			underReview = result.issues
-		case "testing":
-			testing = result.issues
-		}
+	// Wait for user fetch to complete
+	userResult := <-userChan
+	if userResult.err != nil {
+		return errMsg{userResult.err}
 	}
 
 	// Combine Under Review + Testing for Processing panel
@@ -183,7 +153,7 @@ func (m *Model) loadTasksCmd() tea.Msg {
 	processingTasks = sortIssuesByUpdatedDesc(processingTasks)
 
 	return tasksLoadedMsg{
-		user:            user,
+		user:            userResult.user,
 		reportTasks:     inProgress,
 		todoTasks:       todo,
 		processingTasks: processingTasks,
@@ -312,10 +282,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state.WorklogsLoading = true
 		m.state.StatusMessage = fmt.Sprintf("Loaded %d tasks. Loading time data...",
 			len(msg.reportTasks)+len(msg.todoTasks)+len(msg.processingTasks))
-		// Chain Phase 2: Load worklogs in background (with small delay to let UI update)
-		// Use tea.Tick to schedule Phase 2 after UI renders
+		// Chain Phase 2: Load worklogs in background (minimal delay to let UI update)
+		// OPTIMIZED: Reduced from 100ms to 10ms for faster response
 		return m, tea.Batch(
-			tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+			tea.Tick(10*time.Millisecond, func(t time.Time) tea.Msg {
 				return startPhase2Msg{}
 			}),
 		)
