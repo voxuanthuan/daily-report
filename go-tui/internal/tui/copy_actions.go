@@ -15,13 +15,13 @@ func (m Model) showCopyOptions() (tea.Model, tea.Cmd) {
 
 	switch m.state.ActivePanel {
 	case state.PanelReport:
-		tasks = m.state.ReportTasks
+		tasks = m.state.GetFilteredTasks(state.PanelReport)
 		idx = m.state.SelectedIndices[state.PanelReport]
 	case state.PanelTodo:
-		tasks = m.state.TodoTasks
+		tasks = m.state.GetFilteredTasks(state.PanelTodo)
 		idx = m.state.SelectedIndices[state.PanelTodo]
 	case state.PanelProcessing:
-		tasks = m.state.ProcessingTasks
+		tasks = m.state.GetFilteredTasks(state.PanelProcessing)
 		idx = m.state.SelectedIndices[state.PanelProcessing]
 	default:
 		return m, nil

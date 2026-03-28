@@ -18,6 +18,7 @@ type KeyMap struct {
 	Help       key.Binding
 	Quit       key.Binding
 	CopyReport key.Binding
+	Search     key.Binding
 }
 
 func DefaultKeyMap() KeyMap {
@@ -35,5 +36,6 @@ func DefaultKeyMap() KeyMap {
 		Help:       key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit:       key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 		CopyReport: key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy report")),
+		Search:     key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/atotto/clipboard"
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yourusername/jira-daily-report/internal/model"
@@ -15,11 +16,13 @@ import (
 // ReportPreviewModal shows a full-screen preview of the daily report
 type ReportPreviewModal struct {
 	active       bool
+	pending      bool
 	content      string
 	scrollOffset int
 	maxScroll    int
 	width        int
 	height       int
+	spinner      spinner.Model
 }
 
 // reportCopiedMsg is sent when the report is copied to clipboard
@@ -29,16 +32,43 @@ type reportCopiedMsg struct {
 
 // NewReportPreviewModal creates a new report preview modal
 func NewReportPreviewModal(worklogs []model.Worklog, inProgress []model.Issue, prevDate time.Time, width, height int) *ReportPreviewModal {
-	// Build the report content using the report builder
 	content := report.BuildMainReport(worklogs, inProgress, prevDate)
 
 	return &ReportPreviewModal{
 		active:       true,
+		pending:      false,
 		content:      content,
 		scrollOffset: 0,
 		width:        width,
 		height:       height,
 	}
+}
+
+// NewPendingReportPreviewModal creates a modal that shows loading until data is ready
+func NewPendingReportPreviewModal(width, height int) *ReportPreviewModal {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	return &ReportPreviewModal{
+		active:       true,
+		pending:      true,
+		scrollOffset: 0,
+		width:        width,
+		height:       height,
+		spinner:      s,
+	}
+}
+
+// IsPending returns true if the modal is waiting for data to load
+func (m *ReportPreviewModal) IsPending() bool {
+	return m.pending
+}
+
+// BuildReport populates the report content and clears the pending state
+func (m *ReportPreviewModal) BuildReport(content string) {
+	m.content = content
+	m.pending = false
+	m.scrollOffset = 0
 }
 
 // IsActive returns true if the modal is active
@@ -48,6 +78,15 @@ func (m *ReportPreviewModal) IsActive() bool {
 
 // Update handles input for the report preview modal
 func (m *ReportPreviewModal) Update(msg tea.KeyMsg) (*ReportPreviewModal, tea.Cmd) {
+	if m.pending {
+		switch msg.String() {
+		case "esc", "q":
+			m.active = false
+			return m, nil
+		}
+		return m, nil
+	}
+
 	switch msg.String() {
 	case "esc", "q":
 		m.active = false
@@ -101,17 +140,67 @@ func (m *ReportPreviewModal) View() string {
 		return ""
 	}
 
-	// Calculate dimensions
 	modalWidth := m.width - 4
 	modalHeight := m.height - 4
-	contentWidth := modalWidth - 4   // Padding inside modal
-	contentHeight := modalHeight - 6 // Title + footer + padding
+	contentWidth := modalWidth - 4
+	contentHeight := modalHeight - 6
 
 	if contentWidth < 20 {
 		contentWidth = 20
 	}
 	if contentHeight < 5 {
 		contentHeight = 5
+	}
+
+	if m.pending {
+		title := "📋 Daily Report Preview"
+		loadingText := m.spinner.View() + " Loading report data..."
+		loadingHint := "Waiting for data to finish loading..."
+		footer := "esc: close"
+
+		titleStyle := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("86")).
+			Width(contentWidth).
+			Align(lipgloss.Center)
+
+		footerStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			Width(contentWidth).
+			Align(lipgloss.Center)
+
+		loadingStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("205")).
+			Width(contentWidth).
+			Align(lipgloss.Center)
+
+		hintStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			Width(contentWidth).
+			Align(lipgloss.Center)
+
+		separator := strings.Repeat("─", contentWidth)
+
+		modalContent := lipgloss.JoinVertical(
+			lipgloss.Left,
+			titleStyle.Render(title),
+			separator,
+			"",
+			loadingStyle.Render(loadingText),
+			hintStyle.Render(loadingHint),
+			"",
+			separator,
+			footerStyle.Render(footer),
+		)
+
+		modalStyle := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("63")).
+			Padding(1, 2).
+			Width(modalWidth).
+			Height(modalHeight)
+
+		return modalStyle.Render(modalContent)
 	}
 
 	// Split content into lines

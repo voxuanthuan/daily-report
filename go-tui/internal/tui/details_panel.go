@@ -1,8 +1,8 @@
 package tui
 
 import (
-	"github.com/yourusername/jira-daily-report/internal/tui/state"
 	"fmt"
+	"github.com/yourusername/jira-daily-report/internal/tui/state"
 	"strings"
 
 	"github.com/yourusername/jira-daily-report/internal/model"
@@ -46,14 +46,13 @@ func (m Model) renderDetailsPanel() string {
 		items = append(items, "")
 		items = append(items, itemStyle.Render("⏺ "+selectedTask.Fields.Status.Name))
 
-		// === FIX VERSION (if available) ===
 		if len(selectedTask.Fields.FixVersions) > 0 {
 			versionNames := make([]string, len(selectedTask.Fields.FixVersions))
 			for i, v := range selectedTask.Fields.FixVersions {
 				versionNames[i] = v.Name
 			}
-			fixVersionText := "Fix Version: " + strings.Join(versionNames, ", ")
-			items = append(items, itemStyle.Foreground(colorMuted).Render(fixVersionText))
+			fixVersionText := "🏷 " + strings.Join(versionNames, ", ")
+			items = append(items, fixVersionBadgeStyle.Render(fixVersionText))
 		}
 
 		items = append(items, "")

@@ -67,13 +67,13 @@ func NewActionContext(
 
 	switch s.ActivePanel {
 	case state.PanelReport:
-		tasks = s.ReportTasks
+		tasks = s.GetFilteredTasks(state.PanelReport)
 		idx = s.SelectedIndices[state.PanelReport]
 	case state.PanelTodo:
-		tasks = s.TodoTasks
+		tasks = s.GetFilteredTasks(state.PanelTodo)
 		idx = s.SelectedIndices[state.PanelTodo]
 	case state.PanelProcessing:
-		tasks = s.ProcessingTasks
+		tasks = s.GetFilteredTasks(state.PanelProcessing)
 		idx = s.SelectedIndices[state.PanelProcessing]
 	}
 

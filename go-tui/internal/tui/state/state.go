@@ -1,6 +1,7 @@
 package state
 
 import (
+	"strings"
 	"time"
 
 	"github.com/yourusername/jira-daily-report/internal/model"
@@ -48,6 +49,15 @@ type State struct {
 	PollingActive   bool            // Whether polling is currently active
 	LastRefreshTime time.Time       // Last time data was refreshed
 	StateSnapshot   *State          // Snapshot for rollback (optimistic updates)
+
+	SearchActive            bool
+	SearchQuery             string
+	FilteredReportTasks     []model.Issue
+	FilteredTodoTasks       []model.Issue
+	FilteredProcessingTasks []model.Issue
+
+	CachedDescKey  string
+	CachedDescText []string
 }
 
 // ActionState tracks the current state of an executing action
@@ -128,9 +138,17 @@ func (s *State) SetSelectedIndex(index int) {
 	s.SelectedIndices[s.ActivePanel] = index
 }
 
-// GetCurrentTasks returns tasks for the active panel
+// GetCurrentTasks returns tasks for the active panel (filtered if search is active)
 func (s *State) GetCurrentTasks() []model.Issue {
-	switch s.ActivePanel {
+	if s.SearchQuery != "" {
+		return s.GetFilteredCurrentTasks()
+	}
+	return s.GetTasks(s.ActivePanel)
+}
+
+// GetTasks returns the unfiltered task list for a panel
+func (s *State) GetTasks(panel PanelType) []model.Issue {
+	switch panel {
 	case PanelReport:
 		return s.ReportTasks
 	case PanelTodo:
@@ -187,4 +205,87 @@ func (s *State) ScrollDetailsDown(maxScroll int) {
 // ResetDetailsScroll resets scroll when task changes
 func (s *State) ResetDetailsScroll() {
 	s.DetailsScrollOffset = 0
+}
+
+// ApplyFilter filters all task lists by the given query (case-insensitive match on key or summary)
+func (s *State) ApplyFilter(query string) {
+	s.SearchQuery = query
+	if query == "" {
+		s.FilteredReportTasks = s.ReportTasks
+		s.FilteredTodoTasks = s.TodoTasks
+		s.FilteredProcessingTasks = s.ProcessingTasks
+		return
+	}
+	lowerQuery := strings.ToLower(query)
+	s.FilteredReportTasks = filterIssues(s.ReportTasks, lowerQuery)
+	s.FilteredTodoTasks = filterIssues(s.TodoTasks, lowerQuery)
+	s.FilteredProcessingTasks = filterIssues(s.ProcessingTasks, lowerQuery)
+
+	for _, panel := range []PanelType{PanelReport, PanelTodo, PanelProcessing} {
+		tasks := s.GetFilteredTasks(panel)
+		if len(tasks) > 0 && s.SelectedIndices[panel] >= len(tasks) {
+			s.SelectedIndices[panel] = len(tasks) - 1
+		}
+	}
+}
+
+// ClearFilter resets all filtered lists and clears the search query
+func (s *State) ClearFilter() {
+	s.SearchActive = false
+	s.SearchQuery = ""
+	s.FilteredReportTasks = nil
+	s.FilteredTodoTasks = nil
+	s.FilteredProcessingTasks = nil
+}
+
+// ClearDescCache clears the cached description
+func (s *State) ClearDescCache() {
+	s.CachedDescKey = ""
+	s.CachedDescText = nil
+}
+
+// GetFilteredTasks returns the filtered task list for the given panel
+func (s *State) GetFilteredTasks(panel PanelType) []model.Issue {
+	if s.SearchQuery == "" {
+		return s.GetTasks(panel)
+	}
+	switch panel {
+	case PanelReport:
+		if s.FilteredReportTasks != nil {
+			return s.FilteredReportTasks
+		}
+		return s.ReportTasks
+	case PanelTodo:
+		if s.FilteredTodoTasks != nil {
+			return s.FilteredTodoTasks
+		}
+		return s.TodoTasks
+	case PanelProcessing:
+		if s.FilteredProcessingTasks != nil {
+			return s.FilteredProcessingTasks
+		}
+		return s.ProcessingTasks
+	default:
+		return []model.Issue{}
+	}
+}
+
+// GetFilteredCurrentTasks returns filtered tasks for the active panel
+func (s *State) GetFilteredCurrentTasks() []model.Issue {
+	return s.GetFilteredTasks(s.ActivePanel)
+}
+
+// filterIssues returns issues matching the lowercase query
+func filterIssues(issues []model.Issue, lowerQuery string) []model.Issue {
+	var result []model.Issue
+	for _, issue := range issues {
+		if strings.Contains(strings.ToLower(issue.Key), lowerQuery) ||
+			strings.Contains(strings.ToLower(issue.Fields.Summary), lowerQuery) {
+			result = append(result, issue)
+		}
+	}
+	if result == nil {
+		return []model.Issue{}
+	}
+	return result
 }

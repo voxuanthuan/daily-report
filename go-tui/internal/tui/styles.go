@@ -19,71 +19,75 @@ var (
 	colorSelected = lipgloss.Color("#e2b714") // Gold for selected items
 
 	// Extended colors for Bubble Tea v2 styling
-	colorBgDark      = lipgloss.Color("#1E1E2E")  // Dark blue-gray
-	colorBgPanel     = lipgloss.Color("#282838")  // Panel background
-	colorBgSelected  = lipgloss.Color("#313244")  // Selected background
-	colorFgSecondary = lipgloss.Color("#A6ADC8")  // Light gray
-	colorFgDim       = lipgloss.Color("#6C7086")  // Dimmed gray
-	colorInfo        = lipgloss.Color("#8BE9FD")  // Light blue
-	colorAccent      = lipgloss.Color("#BD93F9")  // Purple
+	colorBgDark      = lipgloss.Color("#1E1E2E") // Dark blue-gray
+	colorBgPanel     = lipgloss.Color("#282838") // Panel background
+	colorBgSelected  = lipgloss.Color("#313244") // Selected background
+	colorFgSecondary = lipgloss.Color("#A6ADC8") // Light gray
+	colorFgDim       = lipgloss.Color("#6C7086") // Dimmed gray
+	colorInfo        = lipgloss.Color("#8BE9FD") // Light blue
+	colorAccent      = lipgloss.Color("#BD93F9") // Purple
 )
 
 // Base styles
 var (
 	baseStyle = lipgloss.NewStyle().
-		Foreground(colorFg).
-		Background(colorBgDark)
+			Foreground(colorFg).
+			Background(colorBgDark)
 
 	dimStyle = baseStyle.Copy().
-		Foreground(colorFgDim)
+			Foreground(colorFgDim)
 )
 
 // Panel styles
 var (
 	activeBorderStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(colorPrimary).
-		Padding(0, 1)
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(colorPrimary).
+				Padding(0, 1)
 
 	inactiveBorderStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(colorBorder).
-		Padding(0, 1)
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(colorBorder).
+				Padding(0, 1)
 
 	panelTitleFocused = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(colorPrimary).
-		Background(colorBgSelected).
-		Padding(0, 2)
+				Bold(true).
+				Foreground(colorPrimary).
+				Background(colorBgSelected).
+				Padding(0, 2)
 
 	panelTitleUnfocused = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(colorFgSecondary).
-		Padding(0, 2)
+				Bold(true).
+				Foreground(colorFgSecondary).
+				Padding(0, 2)
 )
 
 // Task list styles
 var (
 	titleStyle        = lipgloss.NewStyle().Bold(true).Foreground(colorPrimary)
 	selectedItemStyle = lipgloss.NewStyle().
-		Background(colorBgSelected).
-		Foreground(colorSelected).
-		Bold(true).
-		Padding(0, 1)
+				Background(colorBgSelected).
+				Foreground(colorSelected).
+				Bold(true).
+				Padding(0, 1)
 	itemStyle = lipgloss.NewStyle().
-		Foreground(colorFg).
-		Padding(0, 1)
+			Foreground(colorFg).
+			Padding(0, 1)
 
 	// Task key styling
 	taskKeyStyle = lipgloss.NewStyle().
-		Foreground(colorInfo).
-		Bold(true)
+			Foreground(colorInfo).
+			Bold(true)
+
+	// Fix version badge
+	fixVersionBadgeStyle = lipgloss.NewStyle().
+				Foreground(colorFgSecondary)
 
 	// Status badges
 	taskStatusStyle = lipgloss.NewStyle().
-		Padding(0, 1).
-		Foreground(colorBgDark).
-		Bold(true)
+			Padding(0, 1).
+			Foreground(colorBgDark).
+			Bold(true)
 
 	statusTodoStyle       = taskStatusStyle.Copy().Background(colorMuted)
 	statusInProgressStyle = taskStatusStyle.Copy().Background(colorPrimary)
@@ -95,89 +99,89 @@ var (
 // Details panel styles
 var (
 	detailsHeaderStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(colorPrimary).
-		Padding(0, 2)
+				Bold(true).
+				Foreground(colorPrimary).
+				Padding(0, 2)
 
 	detailsLabelStyle = lipgloss.NewStyle().
-		Foreground(colorFgSecondary).
-		Padding(0, 2)
+				Foreground(colorFgSecondary).
+				Padding(0, 2)
 
 	detailsValueStyle = lipgloss.NewStyle().
-		Foreground(colorFg).
-		Padding(0, 1)
+				Foreground(colorFg).
+				Padding(0, 1)
 )
 
 // Time tracking styles
 var (
 	dateHeaderStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(colorAccent).
-		Padding(0, 1)
+			Bold(true).
+			Foreground(colorAccent).
+			Padding(0, 1)
 
 	timeStyle = lipgloss.NewStyle().
-		Foreground(colorSuccess).
-		Bold(true)
+			Foreground(colorSuccess).
+			Bold(true)
 )
 
 // Modal styles (common, but individual modals may override)
 var (
 	modalTitleStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(colorPrimary).
-		MarginBottom(1)
+			Bold(true).
+			Foreground(colorPrimary).
+			MarginBottom(1)
 
 	modalPromptStyle = lipgloss.NewStyle().
-		Foreground(colorFgSecondary).
-		MarginBottom(1)
+				Foreground(colorFgSecondary).
+				MarginBottom(1)
 
 	modalInputFocused = lipgloss.NewStyle().
-		Foreground(colorSuccess).
-		Background(colorBgSelected).
-		Padding(0, 1)
+				Foreground(colorSuccess).
+				Background(colorBgSelected).
+				Padding(0, 1)
 
 	modalInputUnfocused = lipgloss.NewStyle().
-		Foreground(colorFg).
-		Padding(0, 1)
+				Foreground(colorFg).
+				Padding(0, 1)
 
 	modalButtonStyle = lipgloss.NewStyle().
-		Foreground(colorFgSecondary).
-		Padding(0, 2).
-		Margin(0, 1)
+				Foreground(colorFgSecondary).
+				Padding(0, 2).
+				Margin(0, 1)
 
 	modalButtonFocused = modalButtonStyle.Copy().
-		Foreground(colorSuccess).
-		Background(colorBgSelected).
-		Bold(true)
+				Foreground(colorSuccess).
+				Background(colorBgSelected).
+				Bold(true)
 
 	modalErrorStyle = lipgloss.NewStyle().
-		Foreground(colorError).
-		Bold(true).
-		MarginTop(1)
+			Foreground(colorError).
+			Bold(true).
+			MarginTop(1)
 
 	modalSuccessStyle = lipgloss.NewStyle().
-		Foreground(colorSuccess).
-		Bold(true).
-		MarginTop(1)
+				Foreground(colorSuccess).
+				Bold(true).
+				MarginTop(1)
 )
 
 // Status bar styles
 var (
-	statusBarStyle     = lipgloss.NewStyle().Foreground(colorMuted).Padding(0, 1)
-	statusKeyStyle     = lipgloss.NewStyle().Foreground(colorInfo).Bold(true)
+	statusBarStyle       = lipgloss.NewStyle().Foreground(colorMuted).Padding(0, 1)
+	statusKeyStyle       = lipgloss.NewStyle().Foreground(colorInfo).Bold(true)
 	statusSeparatorStyle = lipgloss.NewStyle().Foreground(colorFgDim).SetString(" │ ")
-	statusLoadingStyle = lipgloss.NewStyle().Foreground(colorWarning).SetString("⏳")
-	statusErrorStyle   = lipgloss.NewStyle().Foreground(colorError).Bold(true)
-	statusSuccessStyle = lipgloss.NewStyle().Foreground(colorSuccess)
+	statusLoadingStyle   = lipgloss.NewStyle().Foreground(colorWarning).SetString("⏳")
+	statusErrorStyle     = lipgloss.NewStyle().Foreground(colorError).Bold(true)
+	statusSuccessStyle   = lipgloss.NewStyle().Foreground(colorSuccess)
 
 	errorStyle   = lipgloss.NewStyle().Foreground(colorError).Bold(true)
 	loadingStyle = lipgloss.NewStyle().Foreground(colorWarning).Bold(true)
 
 	// Progress bar styles
-	progressFull      = lipgloss.NewStyle().Foreground(colorSuccess).Background(colorSuccess)
-	progressEmpty     = lipgloss.NewStyle().Foreground(colorBgSelected).Background(colorBgSelected)
-	progressText      = lipgloss.NewStyle().Foreground(colorFgSecondary)
-	progressPercent   = lipgloss.NewStyle().Foreground(colorSuccess).Bold(true)
+	progressFull    = lipgloss.NewStyle().Foreground(colorSuccess).Background(colorSuccess)
+	progressEmpty   = lipgloss.NewStyle().Foreground(colorBgSelected).Background(colorBgSelected)
+	progressText    = lipgloss.NewStyle().Foreground(colorFgSecondary)
+	progressPercent = lipgloss.NewStyle().Foreground(colorSuccess).Bold(true)
 )
 
 // Helper functions

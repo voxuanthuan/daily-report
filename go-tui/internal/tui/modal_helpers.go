@@ -16,13 +16,13 @@ func (m Model) showLogTimeModal() (Model, tea.Cmd) {
 
 	switch m.state.ActivePanel {
 	case state.PanelReport:
-		tasks = m.state.ReportTasks
+		tasks = m.state.GetFilteredTasks(state.PanelReport)
 		idx = m.state.SelectedIndices[state.PanelReport]
 	case state.PanelTodo:
-		tasks = m.state.TodoTasks
+		tasks = m.state.GetFilteredTasks(state.PanelTodo)
 		idx = m.state.SelectedIndices[state.PanelTodo]
 	case state.PanelProcessing:
-		tasks = m.state.ProcessingTasks
+		tasks = m.state.GetFilteredTasks(state.PanelProcessing)
 		idx = m.state.SelectedIndices[state.PanelProcessing]
 	default:
 		m.state.StatusMessage = ""
@@ -41,6 +41,11 @@ func (m Model) showLogTimeModal() (Model, tea.Cmd) {
 }
 
 func (m Model) showReportPreviewModal() (Model, tea.Cmd) {
+	if m.state.Loading || m.state.WorklogsLoading {
+		m.reportPreviewModal = NewPendingReportPreviewModal(m.width, m.height)
+		return m, nil
+	}
+
 	var prevDate time.Time
 	if len(m.state.DateGroups) > 0 {
 		prevDate, _ = time.Parse("2006-01-02", m.state.DateGroups[0].Date)

@@ -13,6 +13,7 @@ import (
 	"github.com/yourusername/jira-daily-report/internal/config"
 	"github.com/yourusername/jira-daily-report/internal/jira"
 	"github.com/yourusername/jira-daily-report/internal/model"
+	"github.com/yourusername/jira-daily-report/internal/report"
 	"github.com/yourusername/jira-daily-report/internal/tui/actions"
 	"github.com/yourusername/jira-daily-report/internal/tui/refresh"
 	"github.com/yourusername/jira-daily-report/internal/tui/state"
@@ -37,6 +38,7 @@ type Model struct {
 	statusModal        *StatusDialogModel
 	lastKey            string
 	spinner            spinner.Model
+	searchBar          SearchBar
 }
 
 type transitionsFetchedMsg struct {
@@ -77,6 +79,7 @@ func NewModel(cfg *config.Manager) *Model {
 		tempoClient:    tempoClient,
 		config:         cfg,
 		spinner:        s,
+		searchBar:      NewSearchBar(80),
 	}
 }
 
@@ -123,8 +126,8 @@ func (m *Model) loadTasksCmd() tea.Msg {
 
 	// Fetch user and all tasks in parallel
 	type result struct {
-		user   *model.User
-		err    error
+		user *model.User
+		err  error
 	}
 	userChan := make(chan result, 1)
 
@@ -214,14 +217,41 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.searchBar.SetWidth(msg.Width)
 		return m, nil
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
+		if m.reportPreviewModal != nil && m.reportPreviewModal.IsPending() {
+			m.reportPreviewModal.spinner, _ = m.reportPreviewModal.spinner.Update(msg)
+		}
 		return m, cmd
 
 	case tea.KeyMsg:
+		if m.searchBar.IsActive() {
+			switch msg.String() {
+			case "esc":
+				m.searchBar.Deactivate()
+				m.state.ClearFilter()
+				return m, nil
+			case "enter":
+				query := m.searchBar.Query()
+				if query == "" {
+					m.searchBar.Deactivate()
+					m.state.ClearFilter()
+				} else {
+					m.searchBar.Accept()
+					m.state.ApplyFilter(query)
+				}
+				return m, nil
+			default:
+				var cmd tea.Cmd
+				m.searchBar, cmd = m.searchBar.Update(msg)
+				m.state.ApplyFilter(m.searchBar.Query())
+				return m, cmd
+			}
+		}
 		if m.logTimeModal != nil && m.logTimeModal.active {
 			updatedModal, cmd := m.logTimeModal.Update(msg)
 			m.logTimeModal = updatedModal
@@ -273,17 +303,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.actionExecutor.ExecuteAction(action, ctx)
 
 	case tasksLoadedMsg:
-		// Phase 1 complete: Tasks loaded, show them immediately
 		m.state.User = msg.user
 		m.state.ReportTasks = msg.reportTasks
 		m.state.TodoTasks = msg.todoTasks
 		m.state.ProcessingTasks = msg.processingTasks
 		m.state.Loading = false
 		m.state.WorklogsLoading = true
+		m.state.ClearDescCache()
+		if m.state.SearchQuery != "" {
+			m.state.ApplyFilter(m.state.SearchQuery)
+		}
 		m.state.StatusMessage = fmt.Sprintf("Loaded %d tasks. Loading time data...",
 			len(msg.reportTasks)+len(msg.todoTasks)+len(msg.processingTasks))
-		// Chain Phase 2: Load worklogs in background (minimal delay to let UI update)
-		// OPTIMIZED: Reduced from 100ms to 10ms for faster response
+
+		if m.reportPreviewModal != nil && m.reportPreviewModal.IsPending() && !m.state.WorklogsLoading {
+			m.buildPendingReport()
+		}
+
 		return m, tea.Batch(
 			tea.Tick(10*time.Millisecond, func(t time.Time) tea.Msg {
 				return startPhase2Msg{}
@@ -291,10 +327,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case worklogsLoadedMsg:
-		// Phase 2 complete: Worklogs loaded
 		m.state.WorklogsLoading = false
 		if msg.err != nil {
 			m.state.StatusMessage = fmt.Sprintf("Tasks ready. Worklog error: %v", msg.err)
+			if m.reportPreviewModal != nil && m.reportPreviewModal.IsPending() {
+				m.buildPendingReport()
+			}
 			return m, nil
 		}
 		m.state.Worklogs = msg.worklogs
@@ -302,16 +340,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state.StatusMessage = fmt.Sprintf("Loaded %d tasks, %d worklogs",
 			len(m.state.ReportTasks)+len(m.state.TodoTasks)+len(m.state.ProcessingTasks),
 			len(msg.worklogs))
+
+		if m.reportPreviewModal != nil && m.reportPreviewModal.IsPending() {
+			m.buildPendingReport()
+		}
+
 		return m, nil
 
 	case startPhase2Msg:
 		// Triggered after UI has had time to render Phase 1 results
 		return m, m.loadWorklogsCmd()
-
-
-
-
-
 
 	case dataLoadedMsg:
 		// Legacy handler - keep for compatibility
@@ -643,6 +681,18 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// First 'y' - just track it
 		m.lastKey = "y"
 		return m, nil
+
+	case "/":
+		m.searchBar.Activate()
+		m.state.SearchActive = true
+		return m, nil
+
+	case "esc":
+		if m.state.SearchQuery != "" {
+			m.searchBar.Deactivate()
+			m.state.ClearFilter()
+			return m, nil
+		}
 	}
 
 	// Reset lastKey for any other key
@@ -662,13 +712,13 @@ func (m Model) handleChangeStatus() (Model, tea.Cmd) {
 
 	switch m.state.ActivePanel {
 	case state.PanelReport:
-		tasks = m.state.ReportTasks
+		tasks = m.state.GetFilteredTasks(state.PanelReport)
 		idx = m.state.SelectedIndices[state.PanelReport]
 	case state.PanelTodo:
-		tasks = m.state.TodoTasks
+		tasks = m.state.GetFilteredTasks(state.PanelTodo)
 		idx = m.state.SelectedIndices[state.PanelTodo]
 	case state.PanelProcessing:
-		tasks = m.state.ProcessingTasks
+		tasks = m.state.GetFilteredTasks(state.PanelProcessing)
 		idx = m.state.SelectedIndices[state.PanelProcessing]
 	default:
 		return m, func() tea.Msg { return statusMessage{message: "No task selected", isError: true} }
@@ -753,9 +803,9 @@ func (m Model) View() string {
 	detailsPanelHeight := leftContentSpace - timePanelHeight
 
 	// Render panels with calculated dimensions
-	reportPanel := m.renderPanelWithSize("Report", state.PanelReport, m.state.ReportTasks, "[1]", leftPanelWidth, h1)
-	todoPanel := m.renderPanelWithSize("Todo", state.PanelTodo, m.state.TodoTasks, "[2]", leftPanelWidth, h2)
-	processingPanel := m.renderPanelWithSize("Processing", state.PanelProcessing, m.state.ProcessingTasks, "[3]", leftPanelWidth, h3)
+	reportPanel := m.renderPanelWithSize("Report", state.PanelReport, m.state.GetFilteredTasks(state.PanelReport), "[1]", leftPanelWidth, h1)
+	todoPanel := m.renderPanelWithSize("Todo", state.PanelTodo, m.state.GetFilteredTasks(state.PanelTodo), "[2]", leftPanelWidth, h2)
+	processingPanel := m.renderPanelWithSize("Processing", state.PanelProcessing, m.state.GetFilteredTasks(state.PanelProcessing), "[3]", leftPanelWidth, h3)
 	detailsPanel := m.renderDetailsPanelWithSize(rightPanelWidth, detailsPanelHeight)
 	timelogPanel := m.renderTimelogPanelWithSize(rightPanelWidth, timePanelHeight)
 
@@ -771,6 +821,11 @@ func (m Model) View() string {
 	statusBar := m.renderStatusBar()
 
 	baseView := lipgloss.JoinVertical(lipgloss.Left, content, statusBar)
+
+	searchView := m.searchBar.View(availableWidth)
+	if searchView != "" {
+		baseView = searchView + "\n" + baseView
+	}
 
 	// Overlay modal if active
 	if m.logTimeModal != nil && m.logTimeModal.active {
@@ -933,7 +988,11 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 
 	// No internal title - will use border title instead
 	if len(tasks) == 0 {
-		items = append(items, itemStyle.Foreground(colorMuted).Render("No tasks"))
+		if m.state.SearchQuery != "" {
+			items = append(items, itemStyle.Foreground(colorMuted).Render("No matches"))
+		} else {
+			items = append(items, itemStyle.Foreground(colorMuted).Render("No tasks"))
+		}
 	} else {
 		// Calculate how many items can fit (more space now without title)
 		maxItems := height - 2 // Only top and bottom borders (title moved to border)
@@ -1166,13 +1225,13 @@ func (m Model) renderDetailsPanelWithSize(width, height int) string {
 
 		switch activePanel {
 		case state.PanelReport:
-			tasks = m.state.ReportTasks
+			tasks = m.state.GetFilteredTasks(state.PanelReport)
 			idx = m.state.SelectedIndices[state.PanelReport]
 		case state.PanelTodo:
-			tasks = m.state.TodoTasks
+			tasks = m.state.GetFilteredTasks(state.PanelTodo)
 			idx = m.state.SelectedIndices[state.PanelTodo]
 		case state.PanelProcessing:
-			tasks = m.state.ProcessingTasks
+			tasks = m.state.GetFilteredTasks(state.PanelProcessing)
 			idx = m.state.SelectedIndices[state.PanelProcessing]
 		}
 
@@ -1197,8 +1256,8 @@ func (m Model) renderDetailsPanelWithSize(width, height int) string {
 				for i, v := range selectedTask.Fields.FixVersions {
 					versionNames[i] = v.Name
 				}
-				fixVersionText := "Fix Version: " + strings.Join(versionNames, ", ")
-				items = append(items, itemStyle.Foreground(colorMuted).Render(fixVersionText))
+				fixVersionText := "🏷 " + strings.Join(versionNames, ", ")
+				items = append(items, fixVersionBadgeStyle.Render(fixVersionText))
 			}
 
 			items = append(items, "")
@@ -1211,7 +1270,14 @@ func (m Model) renderDetailsPanelWithSize(width, height int) string {
 
 			// 5. Description with ADF parsing
 			items = append(items, itemStyle.Foreground(colorMuted).Render("Description:"))
-			descriptionLines := parseDescription(selectedTask.Fields.Description, contentWidth)
+			var descriptionLines []string
+			if selectedTask.Key == m.state.CachedDescKey && m.state.CachedDescText != nil {
+				descriptionLines = m.state.CachedDescText
+			} else {
+				descriptionLines = parseDescription(selectedTask.Fields.Description, contentWidth)
+				m.state.CachedDescKey = selectedTask.Key
+				m.state.CachedDescText = descriptionLines
+			}
 			items = append(items, descriptionLines...)
 		}
 
@@ -1273,9 +1339,15 @@ func (m Model) renderDetailsPanelWithSize(width, height int) string {
 }
 
 func (m Model) renderStatusBar() string {
-	helpText := "q: quit | j/k: move | 1/2/3/0: panels | o: open | c: copy report | yy: copy task | r: refresh | i: log time | H: history"
+	helpText := "q: quit | j/k: move | 1/2/3/0: panels | o: open | c: copy report | yy: copy task | r: refresh | i: log time | /: search | H: history"
 
-	// Add loading spinner if active (without text)
+	if m.state.SearchQuery != "" {
+		tasks := m.state.GetFilteredCurrentTasks()
+		allTasks := m.state.GetTasks(m.state.ActivePanel)
+		matchText := fmt.Sprintf("filter: %d/%d matching | ", len(tasks), len(allTasks))
+		helpText = matchText + helpText
+	}
+
 	if m.state.Loading || m.activePoller != nil {
 		helpText = m.spinner.View() + " " + helpText
 	}
@@ -1365,6 +1437,17 @@ func (m Model) renderHistoryOverlay() string {
 
 	// Center the box
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+}
+
+// buildPendingReport populates a pending report preview modal with loaded data
+func (m *Model) buildPendingReport() {
+	var prevDate time.Time
+	if len(m.state.DateGroups) > 0 {
+		prevDate, _ = time.Parse("2006-01-02", m.state.DateGroups[0].Date)
+	}
+	prevWorklogs := getPreviousDayWorklogs(m.state.Worklogs)
+	content := report.BuildMainReport(prevWorklogs, m.state.ReportTasks, prevDate)
+	m.reportPreviewModal.BuildReport(content)
 }
 
 // groupWorklogsByDate groups worklogs by date
