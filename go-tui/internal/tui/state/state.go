@@ -58,6 +58,8 @@ type State struct {
 
 	CachedDescKey  string
 	CachedDescText []string
+
+	BuddyVisible bool
 }
 
 // ActionState tracks the current state of an executing action

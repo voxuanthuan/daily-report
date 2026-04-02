@@ -15,6 +15,7 @@ import (
 	"github.com/yourusername/jira-daily-report/internal/model"
 	"github.com/yourusername/jira-daily-report/internal/report"
 	"github.com/yourusername/jira-daily-report/internal/tui/actions"
+	"github.com/yourusername/jira-daily-report/internal/tui/buddy"
 	"github.com/yourusername/jira-daily-report/internal/tui/refresh"
 	"github.com/yourusername/jira-daily-report/internal/tui/state"
 )
@@ -39,6 +40,7 @@ type Model struct {
 	lastKey            string
 	spinner            spinner.Model
 	searchBar          SearchBar
+	buddy              *buddy.Buddy
 }
 
 type transitionsFetchedMsg struct {
@@ -80,6 +82,7 @@ func NewModel(cfg *config.Manager) *Model {
 		config:         cfg,
 		spinner:        s,
 		searchBar:      NewSearchBar(80),
+		buddy:          buddy.NewBuddy(cfg.GetUsername()),
 	}
 }
 
@@ -99,6 +102,7 @@ func (m Model) Init() tea.Cmd {
 		m.loadTasksCmd,
 		tea.EnterAltScreen,
 		m.spinner.Tick,
+		m.buddyTickCmd(),
 	)
 }
 
@@ -118,6 +122,14 @@ type worklogsLoadedMsg struct {
 }
 
 type startPhase2Msg struct{}
+
+type buddyTickMsg struct{}
+
+func (m *Model) buddyTickCmd() tea.Cmd {
+	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+		return buddyTickMsg{}
+	})
+}
 
 // loadTasksCmd fetches user and tasks (fast path - Phase 1)
 // OPTIMIZED: Now uses FetchAllTasks which combines 4 queries into 1 HTTP request
@@ -280,21 +292,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case logTimeSubmittedMsg:
-		// Close modal
 		m.logTimeModal = nil
-
+		if m.buddy != nil {
+			m.buddy.TriggerSpeech("log_time")
+		}
 		ctx := actions.NewActionContext(m.state, m.jiraClient, m.tempoClient, m.config)
-		// We use the task from the message to ensure context is correct
-		// Though usually it matches the selected task
 
 		action := actions.NewLogTimeAction(msg.timeValue, msg.description, msg.date)
 		return m, m.actionExecutor.ExecuteAction(action, ctx)
 
 	case statusChangeConfirmedMsg:
 		m.state.StatusMessage = fmt.Sprintf("Changing status to %s...", msg.targetStatus)
-
-		// Close modal
 		m.statusModal = nil
+		if m.buddy != nil {
+			m.buddy.TriggerSpeech("status_change")
+		}
 
 		ctx := actions.NewActionContext(m.state, m.jiraClient, m.tempoClient, m.config)
 
@@ -348,8 +360,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case startPhase2Msg:
-		// Triggered after UI has had time to render Phase 1 results
 		return m, m.loadWorklogsCmd()
+
+	case buddyTickMsg:
+		if m.buddy != nil {
+			m.buddy.Tick()
+			m.buddy.ClearSpeech()
+			if !m.buddy.WelcomeShown {
+				if msg := m.buddy.WelcomeMessage(); msg != "" {
+					m.buddy.Speech = msg
+					m.buddy.SpeechTime = time.Now()
+				}
+			} else if idleMsg := m.buddy.CheckIdle(); idleMsg != "" {
+				m.buddy.Speech = idleMsg
+				m.buddy.SpeechTime = time.Now()
+			}
+		}
+		return m, m.buddyTickCmd()
 
 	case dataLoadedMsg:
 		// Legacy handler - keep for compatibility
@@ -378,11 +405,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case copyDoneMsg:
 		m.state.StatusMessage = msg.message
 		m.copyOptionsModal = nil
+		if m.buddy != nil {
+			m.buddy.TriggerSpeech("copy")
+		}
 		return m, nil
 
 	case reportCopiedMsg:
 		m.state.StatusMessage = msg.message
 		m.reportPreviewModal = nil
+		if m.buddy != nil {
+			m.buddy.TriggerSpeech("copy")
+		}
 		return m, nil
 
 	case delayedRefreshMsg:
@@ -529,8 +562,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case actions.ActionFailedMsg:
-		m.state.CurrentAction = nil // Clear current action
+		m.state.CurrentAction = nil
 		m.state.StatusMessage = fmt.Sprintf("✗ %s failed: %v", msg.ActionName, msg.Error)
+		if m.buddy != nil {
+			m.buddy.TriggerSpeech("error")
+		}
 
 		// Record in history
 		m.state.ActionHistory = append(m.state.ActionHistory, state.ActionResult{
@@ -559,6 +595,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // handleKeyPress handles keyboard input
 func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.buddy != nil {
+		m.buddy.TouchActivity()
+	}
+
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
@@ -647,17 +687,33 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "o":
-		// Open Jira ticket in browser using new action framework
 		ctx := actions.NewActionContext(m.state, m.jiraClient, m.tempoClient, m.config)
 		action := actions.NewOpenURLAction()
+		if m.buddy != nil {
+			m.buddy.TriggerSpeech("open")
+		}
 		return m, m.actionExecutor.ExecuteAction(action, ctx)
 
 	case "r":
-		// Refresh data (progressive loading)
 		m.state.Loading = true
 		m.state.WorklogsLoading = true
 		m.state.StatusMessage = "Refreshing..."
+		if m.buddy != nil {
+			m.buddy.TriggerSpeech("refresh")
+		}
 		return m, m.loadTasksCmd
+
+	case "V":
+		if m.lastKey == "V" {
+			m.lastKey = ""
+			if m.buddy != nil {
+				m.buddy.Reroll()
+				m.buddy.TriggerSpeech("refresh")
+			}
+			return m, nil
+		}
+		m.lastKey = "V"
+		return m, nil
 
 	case "H":
 		// Toggle history overlay
@@ -696,7 +752,7 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Reset lastKey for any other key
-	if msg.String() != "y" {
+	if msg.String() != "y" && msg.String() != "V" {
 		m.lastKey = ""
 	}
 
@@ -827,7 +883,6 @@ func (m Model) View() string {
 		baseView = searchView + "\n" + baseView
 	}
 
-	// Overlay modal if active
 	if m.logTimeModal != nil && m.logTimeModal.active {
 		// Render modal without any placement
 		modalView := m.logTimeModal.View()
@@ -1070,16 +1125,11 @@ func (m Model) renderTimelogPanelWithSize(width, height int) string {
 
 	var items []string
 
-	// Always render in expanded mode
-	// Title will be in border, not in content
-
-	// Show loading indicator when worklogs are being fetched
 	if m.state.WorklogsLoading {
 		items = append(items, itemStyle.Foreground(colorMuted).Render(m.spinner.View()+" Loading time data..."))
 	} else if len(m.state.DateGroups) == 0 {
 		items = append(items, itemStyle.Foreground(colorMuted).Render("No worklogs"))
 	} else {
-		// Calculate available lines for items: height - borders(2) - title(1)
 		maxItems := height - 3
 		if maxItems < 1 {
 			maxItems = 1
@@ -1123,13 +1173,10 @@ func (m Model) renderTimelogPanelWithSize(width, height int) string {
 		}
 	}
 
-	// No title in content - will be in border
 	content := strings.Join(items, "\n")
 
-	// Title for top border
 	borderTitle := "[4] Time Tracking"
 
-	// Counter for bottom-right
 	counter := ""
 	if len(m.state.DateGroups) > 0 {
 		counter = fmt.Sprintf("%d of %d", selectedIdx+1, len(m.state.DateGroups))
@@ -1137,7 +1184,109 @@ func (m Model) renderTimelogPanelWithSize(width, height int) string {
 		counter = "0 groups"
 	}
 
-	return RenderWithTitleAndCounter(content, width, height, borderTitle, counter, isActive, RoundedBorder)
+	if m.buddy == nil || !m.buddy.Visible {
+		return RenderWithTitleAndCounter(content, width, height, borderTitle, counter, isActive, RoundedBorder)
+	}
+
+	buddyLines := buddy.RenderBuddyLines(m.buddy)
+	if len(buddyLines) == 0 {
+		return RenderWithTitleAndCounter(content, width, height, borderTitle, counter, isActive, RoundedBorder)
+	}
+
+	buddyWidth := buddy.BuddySpriteWidth
+	innerWidth := width - 2
+	if innerWidth < 1 {
+		return RenderWithTitleAndCounter(content, width, height, borderTitle, counter, isActive, RoundedBorder)
+	}
+
+	worklogWidth := innerWidth - buddyWidth - 2
+	if worklogWidth < 10 {
+		return RenderWithTitleAndCounter(content, width, height, borderTitle, counter, isActive, RoundedBorder)
+	}
+
+	borderColor := colorBorder
+	titleColor := colorBorder
+	bgColor := colorBgDark
+	if isActive {
+		borderColor = colorPrimary
+		titleColor = colorPrimary
+		bgColor = colorBgSelected
+	}
+
+	titleRendered := lipgloss.NewStyle().Foreground(titleColor).Background(bgColor).Bold(true).Render(borderTitle)
+	titleWidth := lipgloss.Width(titleRendered)
+	remainingWidth := innerWidth - titleWidth
+	if remainingWidth < 0 {
+		remainingWidth = 0
+	}
+
+	topBorder := lipgloss.NewStyle().Foreground(borderColor).Render(RoundedBorder.TopLeft) +
+		titleRendered +
+		lipgloss.NewStyle().Foreground(borderColor).Render(strings.Repeat(RoundedBorder.Horizontal, remainingWidth)) +
+		lipgloss.NewStyle().Foreground(borderColor).Render(RoundedBorder.TopRight)
+
+	counterRendered := ""
+	counterWidth := 0
+	if counter != "" {
+		if isActive {
+			counterRendered = lipgloss.NewStyle().Foreground(colorSuccess).Bold(true).Render(counter)
+		} else {
+			counterRendered = lipgloss.NewStyle().Foreground(colorFgDim).Render(counter)
+		}
+		counterWidth = lipgloss.Width(counterRendered)
+	}
+	leftPad := innerWidth - counterWidth
+	if leftPad < 0 {
+		leftPad = 0
+	}
+	bottomBorder := lipgloss.NewStyle().Foreground(borderColor).Render(RoundedBorder.BottomLeft) +
+		lipgloss.NewStyle().Foreground(borderColor).Render(strings.Repeat(RoundedBorder.Horizontal, leftPad)) +
+		counterRendered +
+		lipgloss.NewStyle().Foreground(borderColor).Render(RoundedBorder.BottomRight)
+
+	contentLines := strings.Split(content, "\n")
+	contentHeight := height - 2
+	for len(contentLines) < contentHeight {
+		contentLines = append(contentLines, "")
+	}
+	if len(contentLines) > contentHeight {
+		contentLines = contentLines[:contentHeight]
+	}
+
+	emptyBuddy := strings.Repeat(" ", buddyWidth)
+
+	var borderedLines []string
+	borderedLines = append(borderedLines, topBorder)
+
+	for i, line := range contentLines {
+		lineWidth := lipgloss.Width(line)
+		rightPad := worklogWidth - lineWidth
+		if rightPad < 0 {
+			rightPad = 0
+		}
+
+		var bl string
+		if i < len(buddyLines) {
+			bl = buddyLines[i]
+		} else {
+			bl = emptyBuddy
+		}
+
+		borderedLine := lipgloss.NewStyle().Foreground(borderColor).Render(RoundedBorder.Vertical) +
+			" " +
+			line +
+			strings.Repeat(" ", rightPad) +
+			"  " +
+			bl +
+			" " +
+			lipgloss.NewStyle().Foreground(borderColor).Render(RoundedBorder.Vertical)
+
+		borderedLines = append(borderedLines, borderedLine)
+	}
+
+	borderedLines = append(borderedLines, bottomBorder)
+
+	return strings.Join(borderedLines, "\n")
 }
 
 // renderDetailsPanelWithSize renders the details panel with dynamic dimensions
@@ -1339,7 +1488,14 @@ func (m Model) renderDetailsPanelWithSize(width, height int) string {
 }
 
 func (m Model) renderStatusBar() string {
-	helpText := "q: quit | j/k: move | 1/2/3/0: panels | o: open | c: copy report | yy: copy task | r: refresh | i: log time | /: search | H: history"
+	helpText := "q: quit | j/k: move | 1/2/3/4/0: panels | o: open | c: copy report | yy: copy task | r: refresh | i: log time | /: search | H: history | V: buddy"
+
+	if m.buddy != nil {
+		face := buddy.RenderBuddyInline(m.buddy)
+		if face != "" {
+			helpText = face + " " + helpText
+		}
+	}
 
 	if m.state.SearchQuery != "" {
 		tasks := m.state.GetFilteredCurrentTasks()

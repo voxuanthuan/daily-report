@@ -59,21 +59,8 @@ func BuildMainReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDa
 
 	uniqueInProgress := deduplicateIssues(inProgress)
 
-	var stories []model.Issue
-	var tasks []model.Issue
-
-	for _, issue := range uniqueInProgress {
-		isStory := strings.EqualFold(issue.Fields.IssueType.Name, "Story") ||
-			strings.EqualFold(issue.Fields.IssueType.Name, "Epic")
-		if isStory {
-			stories = append(stories, issue)
-		} else {
-			tasks = append(tasks, issue)
-		}
-	}
-
-	if len(tasks) > 0 {
-		for _, t := range tasks {
+	if len(uniqueInProgress) > 0 {
+		for _, t := range uniqueInProgress {
 			sb.WriteString(fmt.Sprintf("  ● %s: %s\n", t.Key, t.Fields.Summary))
 		}
 	} else {
@@ -81,13 +68,6 @@ func BuildMainReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDa
 	}
 
 	sb.WriteString("No blockers\n")
-
-	if len(stories) > 0 {
-		sb.WriteString("\nIn-Progress (Story)\n")
-		for _, s := range stories {
-			sb.WriteString(fmt.Sprintf("  ● %s: %s\n", s.Key, s.Fields.Summary))
-		}
-	}
 
 	return sb.String()
 }
