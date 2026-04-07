@@ -11,7 +11,23 @@ var IssueIcons = map[string]string{
 	"Improvement": "⬆️",
 }
 
-// GetIssueIcon returns the emoji icon for an issue type
+var StatusCategoryIcons = map[string]string{
+	"Under Review":      "🔍",
+	"Code Review":       "🔍",
+	"Review":            "🔍",
+	"Ready for Testing": "🧪",
+	"QA":                "🧪",
+	"Testing":           "🧪",
+	"To Test":           "🧪",
+}
+
+func GetStatusCategoryIcon(statusName string) string {
+	if icon, ok := StatusCategoryIcons[statusName]; ok {
+		return icon
+	}
+	return ""
+}
+
 func GetIssueIcon(issueType string) string {
 	if icon, ok := IssueIcons[issueType]; ok {
 		return icon

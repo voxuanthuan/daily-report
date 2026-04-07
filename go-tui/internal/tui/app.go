@@ -160,12 +160,13 @@ func (m *Model) loadTasksCmd() tea.Msg {
 		return errMsg{userResult.err}
 	}
 
-	// Combine Under Review + Testing for Processing panel
+	// Sort each group individually, then combine (Under Review on top)
+	underReview = sortIssuesByUpdatedDesc(underReview)
+	testing = sortIssuesByUpdatedDesc(testing)
 	processingTasks := append(underReview, testing...)
 
-	// Sort Todo and Processing tasks by updated date
+	// Sort Todo tasks by updated date
 	todo = sortIssuesByUpdatedDesc(todo)
-	processingTasks = sortIssuesByUpdatedDesc(processingTasks)
 
 	return tasksLoadedMsg{
 		user:            userResult.user,
@@ -1087,8 +1088,19 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 			// Get emoji icon for issue type
 			icon := GetIssueIcon(task.Fields.IssueType.Name)
 
+			// For Processing panel, add status category icon
+			statusIcon := ""
+			extraWidth := 0
+			if panelType == state.PanelProcessing {
+				statusIcon = GetStatusCategoryIcon(task.Fields.Status.Name)
+				if statusIcon != "" {
+					statusIcon += " "
+					extraWidth = len(statusIcon)
+				}
+			}
+
 			// Truncate summary to fit width
-			maxSummaryLen := width - len(icon) - len(task.Key) - 8
+			maxSummaryLen := width - len(icon) - len(task.Key) - 8 - extraWidth
 			summary := task.Fields.Summary
 			if maxSummaryLen < 0 { // Ensure maxSummaryLen is not negative
 				maxSummaryLen = 0
@@ -1096,7 +1108,7 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 			if len(summary) > maxSummaryLen {
 				summary = summary[:maxSummaryLen-3] + "..."
 			}
-			taskText := fmt.Sprintf("%s %s: %s", icon, task.Key, summary)
+			taskText := fmt.Sprintf("%s%s %s: %s", statusIcon, icon, task.Key, summary)
 			items = append(items, style.Render(prefix+taskText))
 		}
 	}
