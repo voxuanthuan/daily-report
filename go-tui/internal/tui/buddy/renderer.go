@@ -6,16 +6,19 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const BuddySpriteWidth = 17
+const BuddySpriteWidth = 14
 
 var buddyColor = lipgloss.Color("#87ceeb")
 
-func padLine(s string, width int) string {
+func centerLine(s string, width int) string {
 	w := lipgloss.Width(s)
 	if w >= width {
 		return s
 	}
-	return s + strings.Repeat(" ", width-w)
+	pad := width - w
+	left := pad / 2
+	right := pad - left
+	return strings.Repeat(" ", left) + s + strings.Repeat(" ", right)
 }
 
 func RenderBuddyLines(b *Buddy) []string {
@@ -34,14 +37,18 @@ func RenderBuddyLines(b *Buddy) []string {
 
 	if b.Speech != "" {
 		msg := b.Speech
-		maxMsgLen := BuddySpriteWidth - 6
-		if len(msg) > maxMsgLen {
-			msg = msg[:maxMsgLen-1] + "~"
+		maxMsgLen := BuddySpriteWidth - 4
+		if lipgloss.Width(msg) > maxMsgLen {
+			runes := []rune(msg)
+			truncLen := maxMsgLen - 1
+			if truncLen < len(runes) {
+				msg = string(runes[:truncLen]) + "~"
+			}
 		}
 		mid := "< " + msg + " >"
-		bot := " " + strings.Repeat("-", len(msg)+2)
-		result[0] = style.Render(padLine(mid, BuddySpriteWidth))
-		result[1] = style.Render(padLine(bot, BuddySpriteWidth))
+		bot := " " + strings.Repeat("-", lipgloss.Width(msg)+2)
+		result[0] = style.Render(centerLine(mid, BuddySpriteWidth))
+		result[1] = style.Render(centerLine(bot, BuddySpriteWidth))
 	}
 
 	rawLines := RenderSprite(b.Bones, b.Frame)
@@ -51,16 +58,19 @@ func RenderBuddyLines(b *Buddy) []string {
 			break
 		}
 		trimmed := strings.TrimRight(line, " ")
-		padded := " " + trimmed
-		result[idx] = style.Render(padLine(padded, BuddySpriteWidth))
+		result[idx] = style.Render(centerLine(trimmed, BuddySpriteWidth))
 	}
 
 	if b.Name != "" {
 		nameDisplay := "~" + b.Name
 		if lipgloss.Width(nameDisplay) > BuddySpriteWidth {
-			nameDisplay = nameDisplay[:BuddySpriteWidth-1] + "~"
+			runes := []rune(nameDisplay)
+			maxLen := BuddySpriteWidth - 1
+			if maxLen < len(runes) {
+				nameDisplay = string(runes[:maxLen]) + "~"
+			}
 		}
-		result[7] = nameStyle.Render(padLine(nameDisplay, BuddySpriteWidth))
+		result[7] = nameStyle.Render(centerLine(nameDisplay, BuddySpriteWidth))
 	}
 
 	return result

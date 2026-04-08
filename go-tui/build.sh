@@ -1,18 +1,25 @@
 #!/bin/bash
-# Optimized build script for jira-report TUI
-
 set -e
 
-echo "🔨 Building jira-report with optimizations..."
+echo "Building jira-report..."
 
-# Build with optimization flags
-# -s: Strip symbol table
-# -w: Strip DWARF debugging information
-go build -ldflags="-s -w" -o bin/jira-report ./cmd/jira-report
+OUTPUT_DIR="./bin"
+CMD_PATH="./cmd/jira-report"
+BINARY_NAME="jira-report"
+LDFLAGS="-s -w"
 
-echo "✅ Build complete!"
+mkdir -p "$OUTPUT_DIR"
+
+go build -trimpath -ldflags="$LDFLAGS" -o "$OUTPUT_DIR/${BINARY_NAME}" "$CMD_PATH"
+
+if command -v upx &>/dev/null; then
+    echo "Compressing with UPX..."
+    upx --best --lzma "$OUTPUT_DIR/${BINARY_NAME}" 2>/dev/null || true
+fi
+
+echo "Build complete!"
 echo ""
-echo "📊 Binary size:"
-du -sh bin/jira-report
+echo "Binary size:"
+du -sh "$OUTPUT_DIR/${BINARY_NAME}"
 echo ""
-echo "🚀 Run with: ./bin/jira-report tui"
+echo "Run with: ./$OUTPUT_DIR/$BINARY_NAME tui"
