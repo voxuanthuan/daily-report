@@ -82,7 +82,7 @@ func NewJiraClient(baseURL, username, apiToken string) *JiraClient {
 		IdleConnTimeout:     90 * time.Second,
 		DisableCompression:  false,
 	}
-	
+
 	return &JiraClient{
 		baseURL:  baseURL,
 		username: username,
@@ -103,7 +103,7 @@ func NewOAuthJiraClient(siteURL, oauthToken string) *JiraClient {
 		IdleConnTimeout:     90 * time.Second,
 		DisableCompression:  false,
 	}
-	
+
 	// Get cloud ID for the site
 	cloudID, err := getCloudIDForSite(siteURL, oauthToken)
 	if err != nil {
@@ -235,7 +235,7 @@ func (c *JiraClient) FetchTasks(jql string) ([]model.Issue, error) {
 	payload := map[string]interface{}{
 		"jql":        jql,
 		"maxResults": 100,
-		"fields":     []string{"key", "summary", "status", "issuetype", "priority", "assignee", "description", "fixVersions"},
+		"fields":     []string{"key", "summary", "status", "issuetype", "parent", "priority", "assignee", "description", "fixVersions"},
 	}
 
 	bodyBytes, err := json.Marshal(payload)

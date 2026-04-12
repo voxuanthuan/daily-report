@@ -1085,13 +1085,23 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 				style = selectedItemStyle
 			}
 
+			isChild := isTaskPanel(panelType) && isChildTask(task, tasks)
+
 			// Get emoji icon for issue type
 			icon := GetIssueIcon(task.Fields.IssueType.Name)
+			if panelType == state.PanelProcessing {
+				icon = ""
+			}
+			leadingText := ""
+			if isChild {
+				icon = ""
+				leadingText = childTreePrefix(actualIdx, tasks)
+			}
 
 			// For Processing panel, add status category icon
 			statusIcon := ""
 			extraWidth := 0
-			if panelType == state.PanelProcessing {
+			if panelType == state.PanelProcessing && !isChild {
 				statusIcon = GetStatusCategoryIcon(task.Fields.Status.Name)
 				if statusIcon != "" {
 					statusIcon += " "
@@ -1100,15 +1110,21 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 			}
 
 			// Truncate summary to fit width
-			maxSummaryLen := width - len(icon) - len(task.Key) - 8 - extraWidth
+			maxSummaryLen := width - len(leadingText) - len(icon) - len(task.Key) - 8 - extraWidth
 			summary := task.Fields.Summary
+			if maxSummaryLen < 4 { // Ensure room for truncation logic
+				maxSummaryLen = 4
+			}
 			if maxSummaryLen < 0 { // Ensure maxSummaryLen is not negative
 				maxSummaryLen = 0
 			}
 			if len(summary) > maxSummaryLen {
 				summary = summary[:maxSummaryLen-3] + "..."
 			}
-			taskText := fmt.Sprintf("%s%s %s: %s", statusIcon, icon, task.Key, summary)
+			if icon != "" {
+				icon += " "
+			}
+			taskText := fmt.Sprintf("%s%s%s%s: %s", leadingText, statusIcon, icon, task.Key, summary)
 			items = append(items, style.Render(prefix+taskText))
 		}
 	}
@@ -1128,6 +1144,48 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 	}
 
 	return RenderWithTitleAndCounter(content, width, height, borderTitle, counter, isActive, RoundedBorder)
+}
+
+func isChildTask(task model.Issue, tasks []model.Issue) bool {
+	parent := task.Fields.Parent
+	if parent == nil {
+		return false
+	}
+
+	for _, candidate := range tasks {
+		if candidate.Key == parent.Key {
+			return true
+		}
+	}
+
+	return false
+}
+
+func childTreePrefix(idx int, tasks []model.Issue) string {
+	if idx < 0 || idx >= len(tasks) {
+		return "└─ "
+	}
+
+	task := tasks[idx]
+	parent := task.Fields.Parent
+	if parent == nil {
+		return "└─ "
+	}
+
+	for i := idx + 1; i < len(tasks); i++ {
+		nextTask := tasks[i]
+		nextParent := nextTask.Fields.Parent
+		if nextParent == nil || nextParent.Key != parent.Key {
+			break
+		}
+		return "├─ "
+	}
+
+	return "└─ "
+}
+
+func isTaskPanel(panelType state.PanelType) bool {
+	return panelType == state.PanelReport || panelType == state.PanelTodo || panelType == state.PanelProcessing
 }
 
 // renderTimelogPanelWithSize renders the time tracking panel with dynamic dimensions

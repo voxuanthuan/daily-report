@@ -12,13 +12,13 @@ var IssueIcons = map[string]string{
 }
 
 var StatusCategoryIcons = map[string]string{
-	"Under Review":      "🔍",
-	"Code Review":       "🔍",
-	"Review":            "🔍",
-	"Ready for Testing": "🧪",
-	"QA":                "🧪",
-	"Testing":           "🧪",
-	"To Test":           "🧪",
+	"Under Review":      "👀",
+	"Code Review":       "👀",
+	"Review":            "👀",
+	"Ready for Testing": "🐞",
+	"QA":                "🐞",
+	"Testing":           "🐞",
+	"To Test":           "🐞",
 }
 
 func GetStatusCategoryIcon(statusName string) string {

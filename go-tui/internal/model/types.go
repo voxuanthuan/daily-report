@@ -12,10 +12,24 @@ type IssueFields struct {
 	Summary     string       `json:"summary"`
 	Status      Status       `json:"status"`
 	IssueType   IssueType    `json:"issuetype"`
+	Parent      *IssueParent `json:"parent,omitempty"`
 	Priority    *Priority    `json:"priority,omitempty"`
 	Description interface{}  `json:"description,omitempty"`
 	FixVersions []FixVersion `json:"fixVersions,omitempty"`
 	Updated     string       `json:"updated,omitempty"`
+}
+
+// IssueParent represents the minimal parent issue data needed for hierarchy display.
+type IssueParent struct {
+	ID     string            `json:"id,omitempty"`
+	Key    string            `json:"key"`
+	Fields IssueParentFields `json:"fields"`
+}
+
+// IssueParentFields contains the parent issue fields used by the UI.
+type IssueParentFields struct {
+	Summary   string    `json:"summary"`
+	IssueType IssueType `json:"issuetype"`
 }
 
 // Status represents the issue status

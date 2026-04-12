@@ -152,11 +152,11 @@ func (s *State) GetCurrentTasks() []model.Issue {
 func (s *State) GetTasks(panel PanelType) []model.Issue {
 	switch panel {
 	case PanelReport:
-		return s.ReportTasks
+		return groupTasksByParentInList(s.ReportTasks)
 	case PanelTodo:
-		return s.TodoTasks
+		return groupTasksByParentInList(s.TodoTasks)
 	case PanelProcessing:
-		return s.ProcessingTasks
+		return groupTasksByParentInList(s.ProcessingTasks)
 	default:
 		return []model.Issue{}
 	}
@@ -254,19 +254,19 @@ func (s *State) GetFilteredTasks(panel PanelType) []model.Issue {
 	switch panel {
 	case PanelReport:
 		if s.FilteredReportTasks != nil {
-			return s.FilteredReportTasks
+			return groupTasksByParentInList(s.FilteredReportTasks)
 		}
-		return s.ReportTasks
+		return groupTasksByParentInList(s.ReportTasks)
 	case PanelTodo:
 		if s.FilteredTodoTasks != nil {
-			return s.FilteredTodoTasks
+			return groupTasksByParentInList(s.FilteredTodoTasks)
 		}
-		return s.TodoTasks
+		return groupTasksByParentInList(s.TodoTasks)
 	case PanelProcessing:
 		if s.FilteredProcessingTasks != nil {
-			return s.FilteredProcessingTasks
+			return groupTasksByParentInList(s.FilteredProcessingTasks)
 		}
-		return s.ProcessingTasks
+		return groupTasksByParentInList(s.ProcessingTasks)
 	default:
 		return []model.Issue{}
 	}
@@ -290,4 +290,59 @@ func filterIssues(issues []model.Issue, lowerQuery string) []model.Issue {
 		return []model.Issue{}
 	}
 	return result
+}
+
+func groupTasksByParentInList(tasks []model.Issue) []model.Issue {
+	if len(tasks) < 2 {
+		return tasks
+	}
+
+	ordered := make([]model.Issue, 0, len(tasks))
+	issueByKey := make(map[string]model.Issue, len(tasks))
+	childrenByParent := make(map[string][]model.Issue)
+	isChildInList := make(map[string]bool)
+
+	for _, task := range tasks {
+		issueByKey[task.Key] = task
+	}
+
+	for _, task := range tasks {
+		parent := task.Fields.Parent
+		if parent == nil {
+			continue
+		}
+		if _, ok := issueByKey[parent.Key]; !ok {
+			continue
+		}
+
+		childrenByParent[parent.Key] = append(childrenByParent[parent.Key], task)
+		isChildInList[task.Key] = true
+	}
+
+	added := make(map[string]bool, len(tasks))
+	for _, task := range tasks {
+		if isChildInList[task.Key] {
+			continue
+		}
+
+		ordered = append(ordered, task)
+		added[task.Key] = true
+
+		for _, child := range childrenByParent[task.Key] {
+			if added[child.Key] {
+				continue
+			}
+			ordered = append(ordered, child)
+			added[child.Key] = true
+		}
+	}
+
+	for _, task := range tasks {
+		if added[task.Key] {
+			continue
+		}
+		ordered = append(ordered, task)
+	}
+
+	return ordered
 }

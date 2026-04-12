@@ -14,7 +14,7 @@ func (c *JiraClient) FetchTasksByJQL(jql string) ([]model.Issue, error) {
 	// Build request body (POST method is recommended for Jira API)
 	requestBody := map[string]interface{}{
 		"jql":        jql,
-		"fields":     []string{"summary", "status", "issuetype", "priority", "description", "updated", "fixVersions"},
+		"fields":     []string{"summary", "status", "issuetype", "parent", "priority", "description", "updated", "fixVersions"},
 		"maxResults": 100,
 	}
 
