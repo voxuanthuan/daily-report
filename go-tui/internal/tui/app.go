@@ -1085,7 +1085,11 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 				style = selectedItemStyle
 			}
 
-			isChild := isTaskPanel(panelType) && isChildTask(task, tasks)
+			depth := 0
+			if isTaskPanel(panelType) {
+				depth = taskDepth(task, tasks)
+			}
+			isChild := depth > 0
 
 			// Get emoji icon for issue type
 			icon := GetIssueIcon(task.Fields.IssueType.Name)
@@ -1095,7 +1099,7 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 			leadingText := ""
 			if isChild {
 				icon = ""
-				leadingText = childTreePrefix(actualIdx, tasks)
+				leadingText = taskTreePrefix(actualIdx, tasks)
 			}
 
 			// For Processing panel, add status category icon
@@ -1110,7 +1114,7 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 			}
 
 			// Truncate summary to fit width
-			maxSummaryLen := width - len(leadingText) - len(icon) - len(task.Key) - 8 - extraWidth
+			maxSummaryLen := width - lipgloss.Width(leadingText) - len(icon) - len(task.Key) - 8 - extraWidth
 			summary := task.Fields.Summary
 			if maxSummaryLen < 4 { // Ensure room for truncation logic
 				maxSummaryLen = 4
@@ -1146,42 +1150,61 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 	return RenderWithTitleAndCounter(content, width, height, borderTitle, counter, isActive, RoundedBorder)
 }
 
-func isChildTask(task model.Issue, tasks []model.Issue) bool {
-	parent := task.Fields.Parent
-	if parent == nil {
-		return false
-	}
-
+func taskDepth(task model.Issue, tasks []model.Issue) int {
+	issueByKey := make(map[string]model.Issue, len(tasks))
 	for _, candidate := range tasks {
-		if candidate.Key == parent.Key {
-			return true
-		}
+		issueByKey[candidate.Key] = candidate
 	}
 
-	return false
+	depth := 0
+	parent := task.Fields.Parent
+	visited := map[string]bool{task.Key: true}
+	for parent != nil {
+		candidate, ok := issueByKey[parent.Key]
+		if !ok || visited[parent.Key] {
+			break
+		}
+
+		depth++
+		visited[parent.Key] = true
+		parent = candidate.Fields.Parent
+	}
+
+	return depth
 }
 
-func childTreePrefix(idx int, tasks []model.Issue) string {
+func taskTreePrefix(idx int, tasks []model.Issue) string {
 	if idx < 0 || idx >= len(tasks) {
 		return "└─ "
 	}
 
 	task := tasks[idx]
+	depth := taskDepth(task, tasks)
+	if depth == 0 {
+		return ""
+	}
+
+	branch := "└─ "
 	parent := task.Fields.Parent
-	if parent == nil {
-		return "└─ "
+	if parent != nil && hasNextSiblingWithParent(idx, tasks, parent.Key) {
+		branch = "├─ "
 	}
 
+	return strings.Repeat("   ", depth-1) + branch
+}
+
+func hasNextSiblingWithParent(idx int, tasks []model.Issue, parentKey string) bool {
 	for i := idx + 1; i < len(tasks); i++ {
-		nextTask := tasks[i]
-		nextParent := nextTask.Fields.Parent
-		if nextParent == nil || nextParent.Key != parent.Key {
-			break
+		nextParent := tasks[i].Fields.Parent
+		if nextParent == nil {
+			continue
 		}
-		return "├─ "
+		if nextParent.Key == parentKey {
+			return true
+		}
 	}
 
-	return "└─ "
+	return false
 }
 
 func isTaskPanel(panelType state.PanelType) bool {

@@ -320,28 +320,33 @@ func groupTasksByParentInList(tasks []model.Issue) []model.Issue {
 	}
 
 	added := make(map[string]bool, len(tasks))
-	for _, task := range tasks {
-		if isChildInList[task.Key] {
-			continue
+	var appendIssueAndDescendants func(model.Issue)
+	appendIssueAndDescendants = func(task model.Issue) {
+		if added[task.Key] {
+			return
 		}
 
 		ordered = append(ordered, task)
 		added[task.Key] = true
 
 		for _, child := range childrenByParent[task.Key] {
-			if added[child.Key] {
-				continue
-			}
-			ordered = append(ordered, child)
-			added[child.Key] = true
+			appendIssueAndDescendants(child)
 		}
+	}
+
+	for _, task := range tasks {
+		if isChildInList[task.Key] {
+			continue
+		}
+
+		appendIssueAndDescendants(task)
 	}
 
 	for _, task := range tasks {
 		if added[task.Key] {
 			continue
 		}
-		ordered = append(ordered, task)
+		appendIssueAndDescendants(task)
 	}
 
 	return ordered
