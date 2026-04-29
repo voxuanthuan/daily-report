@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/yourusername/jira-daily-report/internal/dateutil"
 	"github.com/yourusername/jira-daily-report/internal/tui/state"
 )
 
@@ -55,7 +55,7 @@ func (a *LogTimeAction) Validate(ctx ActionContext) error {
 	a.timeSeconds = seconds
 
 	// Validate date
-	parsedDate, err := parseDate(a.date)
+	parsedDate, err := dateutil.ParseWorklogDate(a.date)
 	if err != nil {
 		return fmt.Errorf("invalid date: %w", err)
 	}
@@ -189,23 +189,4 @@ func parseTimeString(s string) (int, error) {
 	}
 
 	return totalSeconds, nil
-}
-
-// parseDate parses date strings like "today", "yesterday", or "YYYY-MM-DD"
-func parseDate(s string) (string, error) {
-	s = strings.ToLower(strings.TrimSpace(s))
-
-	switch s {
-	case "today", "":
-		return time.Now().Format("2006-01-02"), nil
-	case "yesterday":
-		return time.Now().AddDate(0, 0, -1).Format("2006-01-02"), nil
-	default:
-		// Try parsing as YYYY-MM-DD
-		t, err := time.Parse("2006-01-02", s)
-		if err != nil {
-			return "", fmt.Errorf("invalid date format (use: today, yesterday, or YYYY-MM-DD)")
-		}
-		return t.Format("2006-01-02"), nil
-	}
 }
