@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yourusername/jira-daily-report/internal/api"
+	"github.com/yourusername/jira-daily-report/internal/dateutil"
 	"github.com/yourusername/jira-daily-report/internal/model"
 )
 
@@ -45,7 +46,7 @@ func NewLogTimeModal(task *model.Issue, tempoClient *api.TempoClient, userAccoun
 	di.Width = 40
 
 	dti := textinput.New()
-	dti.Placeholder = "today, yesterday, or YYYY-MM-DD"
+	dti.Placeholder = "today, yesterday, last friday, or YYYY-MM-DD"
 	dti.CharLimit = 20
 	dti.Width = 40
 
@@ -207,7 +208,7 @@ func (m *LogTimeModal) updateDateInput(msg tea.KeyMsg) (*LogTimeModal, tea.Cmd) 
 		}
 
 		// Parse date
-		parsedDate, err := parseDate(dateStr)
+		parsedDate, err := dateutil.ParseWorklogDate(dateStr)
 		if err != nil {
 			m.err = err.Error()
 			return m, nil
@@ -306,7 +307,7 @@ func (m *LogTimeModal) renderDescInput() string {
 }
 
 func (m *LogTimeModal) renderDateInput() string {
-	return "Date (today, yesterday, or YYYY-MM-DD):\n\n" +
+	return fmt.Sprintf("Date (%s):\n\n", dateutil.WorklogDateFormatHelp) +
 		m.dateInput.View() + "\n\n" +
 		itemStyle.Foreground(colorMuted).Render("[Enter] Continue  [ESC] Cancel")
 }
@@ -378,24 +379,6 @@ func parseTimeString(s string) (int, error) {
 	}
 
 	return totalSeconds, nil
-}
-
-func parseDate(s string) (string, error) {
-	s = strings.ToLower(strings.TrimSpace(s))
-
-	switch s {
-	case "today", "":
-		return time.Now().Format("2006-01-02"), nil
-	case "yesterday":
-		return time.Now().AddDate(0, 0, -1).Format("2006-01-02"), nil
-	default:
-		// Try parsing as YYYY-MM-DD
-		t, err := time.Parse("2006-01-02", s)
-		if err != nil {
-			return "", fmt.Errorf("invalid date format (use: today, yesterday, or YYYY-MM-DD)")
-		}
-		return t.Format("2006-01-02"), nil
-	}
 }
 
 // Modal styling

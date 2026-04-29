@@ -6,11 +6,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/yourusername/jira-daily-report/internal/api"
 	"github.com/yourusername/jira-daily-report/internal/config"
+	"github.com/yourusername/jira-daily-report/internal/dateutil"
 )
 
 var (
@@ -66,16 +66,9 @@ Separated by comma. Supported units: h, m.`,
 			log.Fatalf("Failed to fetch user info: %v", err)
 		}
 
-		// Parse date
-		targetDate := time.Now()
-		if date == "yesterday" {
-			targetDate = targetDate.AddDate(0, 0, -1)
-		} else if date != "today" {
-			parsed, err := time.Parse("2006-01-02", date)
-			if err != nil {
-				log.Fatalf("Invalid date format. Use 'today', 'yesterday', or YYYY-MM-DD: %v", err)
-			}
-			targetDate = parsed
+		targetDate, err := dateutil.ParseWorklogDate(date)
+		if err != nil {
+			log.Fatal(err)
 		}
 
 		// Parse entries
@@ -131,7 +124,7 @@ Separated by comma. Supported units: h, m.`,
 			// We need `user` variable.
 			// Let's assume we fetch user before loop.
 
-			_, err = tempoClient.CreateWorklog(issueID, seconds, targetDate.Format("2006-01-02"), description, user.AccountID)
+			_, err = tempoClient.CreateWorklog(issueID, seconds, targetDate, description, user.AccountID)
 			if err != nil {
 				fmt.Printf("❌ Failed to log time for %s: %v\n", entry.key, err)
 			} else {
@@ -205,7 +198,7 @@ func parseDuration(input string) (int, error) {
 }
 
 func init() {
-	logtimeCmd.Flags().StringVarP(&date, "date", "d", "today", "Date to log time (today, yesterday, YYYY-MM-DD)")
+	logtimeCmd.Flags().StringVarP(&date, "date", "d", "today", "Date to log time ("+dateutil.WorklogDateFormatHelp+")")
 	logtimeCmd.Flags().StringVar(&description, "description", "", "Worklog description")
 	logtimeCmd.Flags().BoolVarP(&logtimeSilent, "silent", "s", false, "Suppress info messages")
 
