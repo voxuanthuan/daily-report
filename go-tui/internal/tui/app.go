@@ -103,6 +103,7 @@ func (m Model) Init() tea.Cmd {
 		tea.EnterAltScreen,
 		m.spinner.Tick,
 		m.buddyTickCmd(),
+		m.buddyTravelCmd(),
 	)
 }
 
@@ -124,10 +125,17 @@ type worklogsLoadedMsg struct {
 type startPhase2Msg struct{}
 
 type buddyTickMsg struct{}
+type buddyTravelMsg struct{}
 
 func (m *Model) buddyTickCmd() tea.Cmd {
 	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
 		return buddyTickMsg{}
+	})
+}
+
+func (m *Model) buddyTravelCmd() tea.Cmd {
+	return tea.Tick(7*time.Second, func(t time.Time) tea.Msg {
+		return buddyTravelMsg{}
 	})
 }
 
@@ -378,6 +386,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, m.buddyTickCmd()
+
+	case buddyTravelMsg:
+		if m.buddy != nil && m.buddy.Visible {
+			m.state.AdvanceBuddy()
+			if m.state.BuddyStep%3 == 0 {
+				m.buddy.TriggerSpeech("travel")
+			}
+		}
+		return m, m.buddyTravelCmd()
 
 	case dataLoadedMsg:
 		// Legacy handler - keep for compatibility
@@ -1138,6 +1155,9 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 
 	// Title for top border
 	borderTitle := fmt.Sprintf("%s %s", panelLabel, title)
+	if m.buddy != nil && m.buddy.Visible && m.state.IsBuddyVisiting(panelType) {
+		borderTitle = buddy.RenderBuddyBadge(m.buddy) + borderTitle
+	}
 
 	// Counter for bottom-right showing selection position
 	counter := ""
@@ -1269,6 +1289,10 @@ func (m Model) renderTimelogPanelWithSize(width, height int) string {
 	content := strings.Join(items, "\n")
 
 	borderTitle := "[4] Time Tracking"
+	buddyVisiting := m.buddy != nil && m.buddy.Visible && m.state.IsBuddyVisiting(state.PanelTimelog)
+	if buddyVisiting {
+		borderTitle = buddy.RenderBuddyBadge(m.buddy) + borderTitle
+	}
 
 	counter := ""
 	if len(m.state.DateGroups) > 0 {
@@ -1277,7 +1301,7 @@ func (m Model) renderTimelogPanelWithSize(width, height int) string {
 		counter = "0 groups"
 	}
 
-	if m.buddy == nil || !m.buddy.Visible {
+	if !buddyVisiting {
 		return RenderWithTitleAndCounter(content, width, height, borderTitle, counter, isActive, RoundedBorder)
 	}
 
@@ -1571,6 +1595,9 @@ func (m Model) renderDetailsPanelWithSize(width, height int) string {
 
 	// Title for top border with scroll indicators
 	borderTitle := "Details [0]" + scrollInfo
+	if m.buddy != nil && m.buddy.Visible && m.state.IsBuddyVisiting(state.PanelDetails) {
+		borderTitle = buddy.RenderBuddyBadge(m.buddy) + borderTitle
+	}
 
 	// No counter for details panel
 	counter := ""
@@ -1581,7 +1608,7 @@ func (m Model) renderDetailsPanelWithSize(width, height int) string {
 }
 
 func (m Model) renderStatusBar() string {
-	helpText := "q: quit | j/k: move | 1/2/3/4/0: panels | o: open | c: copy report | yy: copy task | r: refresh | i: log time | /: search | H: history | V: buddy"
+	helpText := "q: quit | j/k: move | 1/2/3/4/0: panels | o: open | c: copy report | yy: copy task | r: refresh | i: log time | /: search | H: history | V/VV: buddy"
 
 	if m.buddy != nil {
 		face := buddy.RenderBuddyInline(m.buddy)

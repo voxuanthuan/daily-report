@@ -118,6 +118,8 @@ Location: /home/user/.jira-daily-report.json
 | `2` | Todo panel |
 | `3` | Testing panel |
 | `4` | Time Tracking panel |
+| `V` | Buddy status |
+| `VV` | Reroll buddy |
 | `q` / `Ctrl+C` | Quit |
 
 ---
@@ -128,6 +130,7 @@ Location: /home/user/.jira-daily-report.json
 ✅ **Real Data** - Fetches from Jira & Tempo APIs
 ✅ **Concurrent Loading** - Parallel data fetching
 ✅ **Worklog Enrichment** - Shows task details with time logged
+✅ **Playful Buddy** - Animated buddy automatically travels between panels
 ✅ **Dark Theme** - Beautiful terminal UI
 ✅ **Single Binary** - No dependencies
 

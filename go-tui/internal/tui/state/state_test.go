@@ -100,6 +100,27 @@ func TestGroupTasksByParentInList_RecursiveHierarchy(t *testing.T) {
 	assert.Equal(t, []string{"T-999", "T-234", "T-235", "T-237", "T-236"}, issueKeys(grouped))
 }
 
+func TestNewStateInitializesBuddyAtTimelog(t *testing.T) {
+	s := NewState()
+
+	assert.Equal(t, PanelTimelog, s.BuddyPanel)
+	assert.True(t, s.IsBuddyVisiting(PanelTimelog))
+	assert.False(t, s.IsBuddyVisiting(PanelReport))
+}
+
+func TestAdvanceBuddyCyclesThroughPanels(t *testing.T) {
+	s := NewState()
+
+	assert.Equal(t, PanelReport, s.AdvanceBuddy())
+	assert.Equal(t, 1, s.BuddyStep)
+	assert.Equal(t, PanelTodo, s.AdvanceBuddy())
+	assert.Equal(t, PanelProcessing, s.AdvanceBuddy())
+	assert.Equal(t, PanelDetails, s.AdvanceBuddy())
+	assert.Equal(t, PanelTimelog, s.AdvanceBuddy())
+	assert.Equal(t, PanelReport, s.AdvanceBuddy())
+	assert.Equal(t, 6, s.BuddyStep)
+}
+
 func issueKeys(issues []model.Issue) []string {
 	keys := make([]string, 0, len(issues))
 	for _, issue := range issues {
