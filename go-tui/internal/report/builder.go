@@ -164,8 +164,7 @@ func isDefaultDescription(desc string) bool {
 	}
 
 	descLower := strings.ToLower(desc)
-	// Check for "working on issue" prefix (case-insensitive)
-	if strings.HasPrefix(descLower, "working on issue") {
+	if strings.HasPrefix(descLower, "working on") {
 		return true
 	}
 

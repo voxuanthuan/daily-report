@@ -858,6 +858,9 @@ func (m Model) View() string {
 	}
 
 	detailsPanelHeight := leftContentSpace - timePanelHeight
+	if detailsPanelHeight < 3 {
+		detailsPanelHeight = 3
+	}
 
 	// Render panels with calculated dimensions
 	reportPanel := m.renderPanelWithSize("Report", state.PanelReport, m.state.GetFilteredTasks(state.PanelReport), "[1]", leftPanelWidth, h1)
