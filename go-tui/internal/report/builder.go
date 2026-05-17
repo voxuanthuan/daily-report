@@ -2,12 +2,15 @@ package report
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/yourusername/jira-daily-report/internal/model"
 )
+
+var defaultDescriptionPattern = regexp.MustCompile(`(?i)^working on (?:issue |work item )?[a-z][a-z0-9]+-\d+$`)
 
 func BuildMainReport(prevTasks []model.Worklog, inProgress []model.Issue, prevDate time.Time) string {
 	var sb strings.Builder
@@ -163,8 +166,7 @@ func isDefaultDescription(desc string) bool {
 		return true
 	}
 
-	descLower := strings.ToLower(desc)
-	if strings.HasPrefix(descLower, "working on") {
+	if defaultDescriptionPattern.MatchString(desc) {
 		return true
 	}
 
