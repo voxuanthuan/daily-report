@@ -60,6 +60,8 @@ type State struct {
 	CachedDescText []string
 
 	BuddyVisible bool
+	BuddyPanel   PanelType
+	BuddyStep    int
 }
 
 // ActionState tracks the current state of an executing action
@@ -123,6 +125,7 @@ func NewState() *State {
 		DateGroups:           []model.DateGroup{},
 		ActivePanel:          PanelReport,
 		SelectedIndices:      make(map[PanelType]int),
+		BuddyPanel:           PanelTimelog,
 		TimeTrackingExpanded: false,
 		Loading:              true, // Start with loading true
 		WorklogsLoading:      false,
@@ -207,6 +210,25 @@ func (s *State) ScrollDetailsDown(maxScroll int) {
 // ResetDetailsScroll resets scroll when task changes
 func (s *State) ResetDetailsScroll() {
 	s.DetailsScrollOffset = 0
+}
+
+// AdvanceBuddy moves Buddy to the next panel in its idle route.
+func (s *State) AdvanceBuddy() PanelType {
+	route := []PanelType{PanelReport, PanelTodo, PanelProcessing, PanelDetails, PanelTimelog}
+	nextIdx := 0
+	for i, panel := range route {
+		if panel == s.BuddyPanel {
+			nextIdx = (i + 1) % len(route)
+			break
+		}
+	}
+	s.BuddyPanel = route[nextIdx]
+	s.BuddyStep++
+	return s.BuddyPanel
+}
+
+func (s *State) IsBuddyVisiting(panel PanelType) bool {
+	return s.BuddyPanel == panel
 }
 
 // ApplyFilter filters all task lists by the given query (case-insensitive match on key or summary)

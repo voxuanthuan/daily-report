@@ -84,3 +84,11 @@ func RenderBuddyInline(b *Buddy) string {
 	style := lipgloss.NewStyle().Foreground(buddyColor)
 	return style.Render(face)
 }
+
+func RenderBuddyBadge(b *Buddy) string {
+	face := RenderBuddyInline(b)
+	if face == "" {
+		return ""
+	}
+	return face + " "
+}
