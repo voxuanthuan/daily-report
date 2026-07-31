@@ -858,6 +858,9 @@ func (m Model) View() string {
 	}
 
 	detailsPanelHeight := leftContentSpace - timePanelHeight
+	if detailsPanelHeight < 3 {
+		detailsPanelHeight = 3
+	}
 
 	// Render panels with calculated dimensions
 	reportPanel := m.renderPanelWithSize("Report", state.PanelReport, m.state.GetFilteredTasks(state.PanelReport), "[1]", leftPanelWidth, h1)
@@ -1039,6 +1042,12 @@ func (m Model) View() string {
 func (m Model) renderPanelWithSize(title string, panelType state.PanelType, tasks []model.Issue, panelLabel string, width int, height int) string {
 	isActive := m.state.ActivePanel == panelType
 	selectedIdx := m.state.SelectedIndices[panelType]
+	if selectedIdx < 0 {
+		selectedIdx = 0
+	}
+	if len(tasks) > 0 && selectedIdx >= len(tasks) {
+		selectedIdx = len(tasks) - 1
+	}
 
 	var items []string
 
@@ -1052,34 +1061,16 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 	} else {
 		// Calculate how many items can fit (more space now without title)
 		maxItems := height - 2 // Only top and bottom borders (title moved to border)
-		displayTasks := tasks
-		if len(tasks) > maxItems {
-			// Show items around selection
-			start := selectedIdx - maxItems/2
-			if start < 0 {
-				start = 0
-			}
-			end := start + maxItems
-			if end > len(tasks) {
-				end = len(tasks)
-				start = end - maxItems
-				if start < 0 {
-					start = 0
-				}
-			}
-			displayTasks = tasks[start:end]
+		if maxItems < 1 {
+			maxItems = 1
 		}
+		start, end := visibleTaskWindow(len(tasks), selectedIdx, maxItems)
+		displayTasks := tasks[start:end]
 
 		for i, task := range displayTasks {
 			prefix := "  "
 			style := itemStyle
-			actualIdx := i
-			if len(tasks) > maxItems {
-				actualIdx = i + (selectedIdx - maxItems/2)
-				if actualIdx < 0 {
-					actualIdx = i
-				}
-			}
+			actualIdx := start + i
 			if actualIdx == selectedIdx && isActive {
 				prefix = "▶ "
 				style = selectedItemStyle
@@ -1104,30 +1095,24 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 
 			// For Processing panel, add status category icon
 			statusIcon := ""
-			extraWidth := 0
 			if panelType == state.PanelProcessing && !isChild {
 				statusIcon = GetStatusCategoryIcon(task.Fields.Status.Name)
 				if statusIcon != "" {
 					statusIcon += " "
-					extraWidth = len(statusIcon)
 				}
 			}
 
 			// Truncate summary to fit width
-			maxSummaryLen := width - lipgloss.Width(leadingText) - len(icon) - len(task.Key) - 8 - extraWidth
-			summary := task.Fields.Summary
-			if maxSummaryLen < 4 { // Ensure room for truncation logic
-				maxSummaryLen = 4
-			}
-			if maxSummaryLen < 0 { // Ensure maxSummaryLen is not negative
-				maxSummaryLen = 0
-			}
-			if len(summary) > maxSummaryLen {
-				summary = summary[:maxSummaryLen-3] + "..."
-			}
 			if icon != "" {
 				icon += " "
 			}
+			fixedText := fmt.Sprintf("%s%s%s%s: ", leadingText, statusIcon, icon, task.Key)
+			maxSummaryLen := panelContentWidth(width) - lipgloss.Width(itemStyle.Render("")) - lipgloss.Width(prefix) - lipgloss.Width(fixedText)
+			summary := task.Fields.Summary
+			if maxSummaryLen < 0 { // Ensure maxSummaryLen is not negative
+				maxSummaryLen = 0
+			}
+			summary = truncateDisplayWidth(summary, maxSummaryLen)
 			taskText := fmt.Sprintf("%s%s%s%s: %s", leadingText, statusIcon, icon, task.Key, summary)
 			items = append(items, style.Render(prefix+taskText))
 		}
@@ -1148,6 +1133,68 @@ func (m Model) renderPanelWithSize(title string, panelType state.PanelType, task
 	}
 
 	return RenderWithTitleAndCounter(content, width, height, borderTitle, counter, isActive, RoundedBorder)
+}
+
+func visibleTaskWindow(total, selectedIdx, maxItems int) (int, int) {
+	if total <= 0 || maxItems <= 0 {
+		return 0, 0
+	}
+	if selectedIdx < 0 {
+		selectedIdx = 0
+	}
+	if selectedIdx >= total {
+		selectedIdx = total - 1
+	}
+	if total <= maxItems {
+		return 0, total
+	}
+
+	start := selectedIdx - maxItems/2
+	if start < 0 {
+		start = 0
+	}
+	end := start + maxItems
+	if end > total {
+		end = total
+		start = end - maxItems
+		if start < 0 {
+			start = 0
+		}
+	}
+
+	return start, end
+}
+
+func panelContentWidth(panelWidth int) int {
+	contentWidth := panelWidth - 4
+	if contentWidth < 0 {
+		return 0
+	}
+	return contentWidth
+}
+
+func truncateDisplayWidth(s string, maxWidth int) string {
+	if maxWidth <= 0 {
+		return ""
+	}
+	if lipgloss.Width(s) <= maxWidth {
+		return s
+	}
+	if maxWidth <= 3 {
+		return strings.Repeat(".", maxWidth)
+	}
+
+	targetWidth := maxWidth - 3
+	var builder strings.Builder
+	for _, r := range s {
+		next := builder.String() + string(r)
+		if lipgloss.Width(next) > targetWidth {
+			break
+		}
+		builder.WriteRune(r)
+	}
+
+	return builder.String() + "..."
 }
 
 func taskDepth(task model.Issue, tasks []model.Issue) int {

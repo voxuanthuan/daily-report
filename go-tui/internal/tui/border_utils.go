@@ -117,6 +117,9 @@ func RenderWithTitleAndCounter(content string, width, height int, title string, 
 	// RENDER CONTENT LINES with side borders
 	contentLines := strings.Split(content, "\n")
 	contentHeight := height - 2 // Exclude top and bottom borders
+	if contentHeight < 0 {
+		contentHeight = 0
+	}
 
 	// Pad or truncate content to fit height
 	for len(contentLines) < contentHeight {

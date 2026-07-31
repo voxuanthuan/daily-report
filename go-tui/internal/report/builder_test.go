@@ -45,6 +45,16 @@ func TestIsDefaultDescription(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "working on work item key",
+			desc:     "Working on work item GRAP-18331",
+			expected: true,
+		},
+		{
+			name:     "working on direct issue key",
+			desc:     "Working on GRAP-18331",
+			expected: true,
+		},
+		{
 			name:     "custom description",
 			desc:     "do task A",
 			expected: false,
@@ -52,6 +62,11 @@ func TestIsDefaultDescription(t *testing.T) {
 		{
 			name:     "custom description with prefix",
 			desc:     "working on the issue",
+			expected: false,
+		},
+		{
+			name:     "custom description after working on",
+			desc:     "working on performance improvements",
 			expected: false,
 		},
 		{
