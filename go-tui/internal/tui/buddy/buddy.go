@@ -317,6 +317,12 @@ func getSpeechMessages(action string) []string {
 			"Here you go!",
 			"Taking you there!",
 		},
+		"travel": {
+			"Scouting around!",
+			"Tiny patrol!",
+			"On my way!",
+			"Panel safari!",
+		},
 		"error": {
 			"Oops! Something went wrong...",
 			"Don't worry, we'll fix it!",
